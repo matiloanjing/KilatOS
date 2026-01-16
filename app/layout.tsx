@@ -46,6 +46,30 @@ export default function RootLayout({
                 />
             </head>
             <body className="bg-obsidian text-white font-sans antialiased">
+                {/* ASCII Art Branding - visible in Elements tab */}
+                <div dangerouslySetInnerHTML={{
+                    __html: `
+<!--
+
+██╗  ██╗██╗██╗      █████╗ ████████╗ ██████╗ ███████╗
+██║ ██╔╝██║██║     ██╔══██╗╚══██╔══╝██╔═══██╗██╔════╝
+█████╔╝ ██║██║     ███████║   ██║   ██║   ██║███████╗
+██╔═██╗ ██║██║     ██╔══██║   ██║   ██║   ██║╚════██║
+██║  ██╗██║███████╗██║  ██║   ██║   ╚██████╔╝███████║
+╚═╝  ╚═╝╚═╝╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚══════╝
+
+Built with ❤️ by KilatCode Studio
+
+-->
+` }} />
+
+                {/* Console Branding Script */}
+                <script dangerouslySetInnerHTML={{
+                    __html: `
+                    console.log('%c ⚡ KILATOS DEVELOPER MODE ', 'background: linear-gradient(90deg, #00ff88, #00ccff); color: #000; font-size: 16px; font-weight: bold; padding: 10px 20px; border-radius: 5px;');
+                    console.log('%c Built with ❤️ by KilatCode Studio ', 'color: #888; font-size: 12px;');
+                ` }} />
+
                 <AuthProvider>
                     {children}
                 </AuthProvider>
