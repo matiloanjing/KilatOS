@@ -1,0 +1,18 @@
+
+export async function getUserRole(userId?: string): Promise<'user' | 'admin'> {
+    if (!userId) return 'user';
+    
+    try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', userId)
+            .single();
+
+        if (error || !data) return 'user';
+        
+        return (data.role as 'user' | 'admin') || 'user';
+    } catch (e) {
+        return 'user';
+    }
+}

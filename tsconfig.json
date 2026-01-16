@@ -1,0 +1,60 @@
+{
+    "compilerOptions": {
+        "target": "ES2020",
+        "lib": [
+            "dom",
+            "dom.iterable",
+            "esnext"
+        ],
+        "allowJs": true,
+        "skipLibCheck": true,
+        "strict": true,
+        "forceConsistentCasingInFileNames": true,
+        "noEmit": true,
+        "esModuleInterop": true,
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "jsx": "preserve",
+        "incremental": true,
+        "plugins": [
+            {
+                "name": "next"
+            }
+        ],
+        "paths": {
+            "@/*": [
+                "./*"
+            ],
+            "@/lib/*": [
+                "./lib/*"
+            ],
+            "@/components/*": [
+                "./components/*"
+            ],
+            "@/app/*": [
+                "./app/*"
+            ]
+        },
+        "typeRoots": [
+            "./node_modules/@types",
+            "./lib/executor"
+        ]
+    },
+    "include": [
+        "next-env.d.ts",
+        "**/*.ts",
+        "**/*.tsx",
+        ".next/types/**/*.ts",
+        "lib/executor/types.d.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "node_modules/@types/jest",
+        "node_modules/@types/phoenix",
+        "scripts",
+        "verification_proof",
+        "testsprite_tests"
+    ]
+}

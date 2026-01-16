@@ -1,0 +1,80 @@
+/**
+ * Jest Configuration
+ * Testing setup for KilatTutor
+ * Copyright © 2025 KilatCode Studio
+ */
+
+import type { Config } from 'jest';
+import nextJest from 'next/jest';
+
+const createJestConfig = nextJest({
+    // Provide the path to your Next.js app to load next.config.js and .env files in your test environment
+    dir: './'
+});
+
+// Add any custom config to be passed to Jest
+const config: Config = {
+    coverageProvider: 'v8',
+    testEnvironment: 'jsdom',
+
+    // Setup files
+    setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+
+    // Module paths
+    moduleNameMapper: {
+        '^@/(.*)$': '<rootDir>/$1',
+        '^@/components/(.*)$': '<rootDir>/components/$1',
+        '^@/lib/(.*)$': '<rootDir>/lib/$1',
+        '^@/app/(.*)$': '<rootDir>/app/$1'
+    },
+
+    // Test match patterns
+    testMatch: [
+        '**/__tests__/**/*.test.[jt]s?(x)',
+        '**/?(*.)+(spec|test).[jt]s?(x)'
+    ],
+
+    // Coverage configuration
+    collectCoverageFrom: [
+        'app/**/*.{js,jsx,ts,tsx}',
+        'lib/**/*.{js,jsx,ts,tsx}',
+        'components/**/*.{js,jsx,ts,tsx}',
+        '!**/*.d.ts',
+        '!**/node_modules/**',
+        '!**/.next/**',
+        '!**/coverage/**',
+        '!**/jest.config.ts',
+        '!**/next.config.js'
+    ],
+
+    // Coverage thresholds
+    coverageThreshold: {
+        global: {
+            branches: 50,
+            functions: 50,
+            lines: 60,
+            statements: 60
+        }
+    },
+
+    // Transform files
+    transform: {
+        '^.+\\.(ts|tsx)$': ['ts-jest', {
+            tsconfig: {
+                jsx: 'react'
+            }
+        }]
+    },
+
+    // Module file extensions
+    moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+
+    // Verbose output
+    verbose: true,
+
+    // Test timeout
+    testTimeout: 30000
+};
+
+// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
+export default createJestConfig(config);

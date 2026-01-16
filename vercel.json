@@ -1,0 +1,29 @@
+{
+    "buildCommand": "npm run build",
+    "devCommand": "npm run dev",
+    "installCommand": "npm install",
+    "framework": "nextjs",
+    "regions": [
+        "iad1"
+    ],
+    "functions": {
+        "app/api/**/*.ts": {
+            "maxDuration": 300,
+            "memory": 1024
+        }
+    },
+    "crons": [
+        {
+            "path": "/api/cron/sync-code-rag",
+            "schedule": "0 3 * * *"
+        },
+        {
+            "path": "/api/cron/rlhf-process",
+            "schedule": "0 4 * * *"
+        }
+    ],
+    "env": {
+        "NEXT_PUBLIC_APP_NAME": "KilatOS",
+        "NEXT_PUBLIC_APP_DESCRIPTION": "AI-Powered Learning Assistant by KilatCode"
+    }
+}

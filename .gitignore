@@ -1,0 +1,127 @@
+# KilatOS
+
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.production
+.env.development
+.env*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Testing
+coverage/
+.nyc_output/
+__tests__/
+*.test.ts
+*.test.tsx
+*.test.js
+*.spec.ts
+*.spec.tsx
+*.spec.js
+testsprite_tests/
+
+# Temporary
+*.tmp
+.cache/
+
+# Supabase (using hosted Supabase directly)
+.supabase/
+supabase/
+
+# ========================================
+# PROJECT SPECIFIC - EXCLUDE FROM GIT
+# ========================================
+
+# Generated code outputs (from AI code generation)
+generated/
+
+# Test scripts and files (not needed in production)
+scripts/
+test-*.js
+test-*.ts
+e2e/
+verification_proof/
+
+# WebContainer test pages
+app/test-webcontainer/
+app/webcontainer-test/
+
+# Test pages and API routes
+app/test/
+app/api/test-*/
+
+# Agent documentation and workflows
+.agent/
+
+# All documentation (keep only README.md)
+docs/
+*.md
+!README.md
+
+# Antigravity brain folder
+.gemini/
+
+# Vercel
+.vercel/
+
+# TypeScript cache
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Lock files (optional - uncomment if using npm only)
+# yarn.lock
+# pnpm-lock.yaml
+
+# ========================================
+# GARBAGE/LOG FILES - DO NOT PUSH
+# ========================================
+
+# Log files
+logs.json
+logs_full.json
+build_log.txt
+*.log
+
+# JSON dumps
+db-audit-report.json
+pollinations_api.json
+
+# Temporary JS files at root
+check-logs.js
+fetch-logs.js
+fetch-logs-admin.js
+
+# VPS setup scripts (contains sensitive paths)
+vps-setup.sh
+
+# Jest/Playwright configs (if not needed in prod)
+# jest.config.ts
+# jest.setup.ts
+# playwright.config.ts

@@ -1,0 +1,119 @@
+'use client';
+/**
+ * KilatResearch - Deep Research Hub (Perplexity-style)
+ * Copyright © 2026 KilatCode Studio
+ */
+
+import { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth/AuthProvider';
+import IconNav from '@/components/ui/IconNav';
+import { ChatPanel } from '@/components/ui/ChatPanel';
+import { GlobalHeader } from '@/components/ui/GlobalHeader';
+import { LoadingKilat } from '@/components/ui/LoadingKilat';
+import { AgentSuggestionPanel } from '@/components/agents/AgentSuggestionPanel';
+import { getPostTaskSuggestions, AGENT_ROUTES, type AgentSuggestion } from '@/lib/agents/post-task-suggestions';
+
+interface Message { id: string; role: 'user' | 'assistant'; content: string; timestamp: number; agent?: string; status?: 'pending' | 'streaming' | 'complete' | 'error'; }
+interface Citation { title: string; url: string; snippet: string; }
+interface PageProps { params: { id: string }; }
+
+export default function KilatResearchPage({ params }: PageProps) {
+    const router = useRouter();
+    const { user, loading } = useAuth();
+    const projectId = params.id;
+
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [selectedModel, setSelectedModel] = useState('gemini-fast');
+    const [availableModels, setAvailableModels] = useState<any[]>([]);
+    const [projectName, setProjectName] = useState('research');
+    const [citations, setCitations] = useState<Citation[]>([]);
+    const [quota, setQuota] = useState({ used: 0, limit: 100, tier: 'free' });
+    const [isChatCollapsed, setIsChatCollapsed] = useState(false);
+    const [suggestions, setSuggestions] = useState<AgentSuggestion[]>([]);
+
+    useEffect(() => { if (projectId) loadProject(projectId); }, [projectId]);
+    const loadProject = async (id: string) => {
+        try {
+            const data = await (await fetch(`/api/kilat/sessions/${id}`)).json();
+            if (data.success && data.messages?.length > 0) {
+                setMessages(data.messages.map((m: any) => ({ id: m.id, role: m.role, content: m.content, timestamp: new Date(m.timestamp).getTime(), status: 'complete' })));
+                if (data.session?.title) setProjectName(data.session.title);
+            }
+        } catch (e) { console.error('Load failed:', e); }
+    };
+
+    useEffect(() => { if (user) fetch('/api/models').then(r => r.json()).then(data => { if (data.success) { setAvailableModels(data.models); setQuota(prev => ({ ...prev, tier: data.userTier })); if (data.selected) setSelectedModel(data.selected); } }); }, [user]);
+    useEffect(() => { if (!loading && !user) router.push('/login'); }, [user, loading, router]);
+
+    // Post-Task Suggestions
+    useEffect(() => {
+        if (!isProcessing && messages.length > 0 && messages[messages.length - 1]?.status === 'complete') {
+            const timer = setTimeout(() => setSuggestions(getPostTaskSuggestions('research')), 500);
+            return () => clearTimeout(timer);
+        }
+    }, [isProcessing, messages]);
+
+    const handleSendMessage = useCallback(async (content: string, attachments?: { type: 'image' | 'document'; name: string; base64: string }[]) => {
+        if ((!content.trim() && (!attachments || attachments.length === 0)) || isProcessing) return;
+        setSuggestions([]);
+        setMessages(prev => [...prev, { id: `msg_${Date.now()}`, role: 'user', content, timestamp: Date.now() }]);
+        setIsProcessing(true);
+        const assistantMsg: Message = { id: `msg_${Date.now()}_assistant`, role: 'assistant', content: '🔬 Researching...', timestamp: Date.now(), agent: 'KilatResearch', status: 'streaming' };
+        setMessages(prev => [...prev, assistantMsg]);
+
+        try {
+            const { jobId } = await (await fetch('/api/kilat/async', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: content, userId: user!.id, sessionId: projectId, mode: 'planning', model: selectedModel, agentType: 'research' }) })).json();
+            let completed = false, pollCount = 0;
+            while (!completed && pollCount < 300) {
+                await new Promise(r => setTimeout(r, 1000)); pollCount++;
+                const statusData = await (await fetch(`/api/kilat/status?jobId=${jobId}`)).json();
+                if (statusData.job?.status === 'completed') {
+                    completed = true;
+                    setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, content: statusData.job.result?.content || 'Research complete!', status: 'complete' as const } : m));
+                    if (statusData.job.result?.citations) setCitations(statusData.job.result.citations);
+                } else if (statusData.job?.status === 'failed') throw new Error(statusData.job.error);
+            }
+        } catch (e) { setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, content: `❌ Error: ${e instanceof Error ? e.message : 'Unknown'}`, status: 'error' as const } : m)); }
+        finally { setIsProcessing(false); }
+    }, [isProcessing, projectId, selectedModel, user?.id]);
+
+    const handleNewProject = useCallback(() => router.push(`/kilatresearch/c/${crypto.randomUUID()}`), [router]);
+    if (loading) return <div className="h-screen w-screen bg-obsidian flex items-center justify-center"><LoadingKilat /></div>;
+
+    return (
+        <div className="flex flex-col h-screen overflow-hidden bg-background-dark font-sans text-slate-200">
+            <GlobalHeader onPublish={() => { }} projectName={projectName} />
+            <main className="flex flex-1 overflow-hidden relative">
+                <IconNav />
+                <ChatPanel sessionId={projectId} messages={messages} isProcessing={isProcessing} chatMode="planning" selectedModel={selectedModel}
+                    onSendMessage={handleSendMessage} onModeChange={() => { }} onModelChange={setSelectedModel} quota={quota}
+                    availableModels={availableModels} onSessionSelect={(id) => router.push(`/kilatresearch/c/${id}`)} onNewChat={handleNewProject}
+                    isCollapsed={isChatCollapsed} onToggleCollapse={() => setIsChatCollapsed(p => !p)} agentType="research" />
+
+                {/* Post-Task Suggestions */}
+                {suggestions.length > 0 && !isChatCollapsed && (
+                    <div className="absolute bottom-20 left-[64px] z-50 w-[360px] px-4">
+                        <AgentSuggestionPanel suggestions={suggestions}
+                            onAccept={(agent) => router.push(`/${AGENT_ROUTES[agent] || agent}/c/${projectId}`)}
+                            onSkip={() => setSuggestions([])} />
+                    </div>
+                )}
+
+                {/* Citations Panel */}
+                <div className="w-80 border-l border-white/10 p-4 overflow-y-auto">
+                    <h3 className="text-xs font-bold uppercase text-slate-500 mb-4">Sources ({citations.length})</h3>
+                    {citations.length === 0 ? <p className="text-sm text-slate-500">Ask a question to see sources</p> :
+                        citations.map((c, i) => (
+                            <a key={i} href={c.url} target="_blank" rel="noopener noreferrer" className="block p-3 rounded-lg bg-white/5 hover:bg-white/10 mb-2">
+                                <p className="text-sm font-medium text-primary truncate">{c.title}</p>
+                                <p className="text-xs text-slate-400 mt-1 line-clamp-2">{c.snippet}</p>
+                            </a>
+                        ))
+                    }
+                </div>
+            </main>
+        </div>
+    );
+}
