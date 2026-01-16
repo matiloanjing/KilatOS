@@ -47,13 +47,8 @@ import { planningAgent, CodePlan } from './planning-agent';
 import { referenceAgent, ReferenceSearchResult } from './reference-agent';
 import { responseCache } from './response-cache';
 
-// Test executor - optional (may not exist in production)
-let testExecutor: any = null;
-import('./test-executor').then(module => {
-    testExecutor = module.testExecutor;
-}).catch(() => {
-    console.warn('⚠️ TestExecutor not available (excluded from production build)');
-});
+// Test executor removed - not needed in production
+const testExecutor: any = null;
 
 // ============================================================================
 // Types (Internal - Advanced Backend)
