@@ -8,7 +8,7 @@
     ],
     "functions": {
         "app/api/**/*.ts": {
-            "maxDuration": 300,
+            "maxDuration": 60,
             "memory": 1024
         }
     },
@@ -24,6 +24,6 @@
     ],
     "env": {
         "NEXT_PUBLIC_APP_NAME": "KilatOS",
-        "NEXT_PUBLIC_APP_DESCRIPTION": "AI-Powered Learning Assistant by KilatCode"
+        "NEXT_PUBLIC_APP_DESCRIPTION": "AI-Powered Code Generation OS by KilatCode"
     }
 }
