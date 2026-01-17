@@ -528,8 +528,7 @@ export default function WebContainerPreview({
                 } catch (timeoutError) {
                     addLog('⚠️ npm install timed out, attempting to start server anyway...');
                     console.warn('📦 [WebContainer] npm install timeout, forcing continue');
-                    // Kill the install process if still running
-                    try { installProcess.kill(); } catch { }
+                    // Note: WebContainer spawn doesn't have kill() method, just continue
                 }
                 if (!isMounted) return;
 
