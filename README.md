@@ -12,28 +12,70 @@
 
 ## 🚀 Features
 
-### Multi-Agent AI System
-- **12 Specialized AI Agents** - Planner, Coder, Reviewer, Deployer, and more
-- **Planning Mode** - For complex projects with architectural planning
-- **Fast Mode** - Quick generation for simple requests
-- **Self-Healing Code** - Automatic error detection and fixing
+## 📊 System Topology
 
-### Real-Time Code Preview
-- **WebContainer Integration** - Full Node.js runtime in browser
-- **Live Preview** - See your app running instantly
-- **Monaco Editor** - VS Code-powered editing experience
+```mermaid
+graph TD
+    User((User)) --> |Interaction| FE[Frontend: Hybrid IDE]
+    
+    subgraph Frontend [Next.js Client]
+        FE --> |Chat Stream| Chat[KilatChat Panel]
+        FE --> |Live Code| Work[Workspace Panel]
+        Work --> |Monaco| Editor[Code Editor]
+        Work --> |WebContainer| Preview[Live Preview]
+    end
+    
+    FE --> |API Request| API[Next.js API Routes]
+    
+    subgraph Backend [The Mandor Monolith]
+        API --> |Orchestrate| Mandor[Mandor AI Gateway]
+        
+        subgraph Skynet [Skynet Learning System]
+            RLHF[RLHF Engine] --> |Adjustments| Mandor
+            Memory[User Memory] --> |Preferences| Mandor
+            Patterns[Proven Patterns] --> |Success History| Mandor
+        end
+        
+        Mandor --> |Route| Tier{Tier Router}
+        Tier --> |Simple| Cache[Semantic Cache]
+        Tier --> |Complex| Planner[Planner Agent]
+        
+        Mandor --> |Knowledge| RAG[Per-Agent RAG]
+        RAG --> |Vector| PGVector[(pgvector)]
+    end
+    
+    Mandor --> |Store| DB[(Supabase DB)]
+    User --> |Feedback| RLHF
+```
 
-### AI Capabilities
-- **Multi-Model Support** - Groq, OpenAI, Gemini, Pollinations (28+ models)
-- **Intelligent Routing** - Automatic model selection based on task
-- **Rate Limiting & Fallbacks** - Robust error handling
-- **Context Memory** - Session-aware conversations
+---
 
-### Developer Experience
-- **Code Export** - Download as ZIP or push to GitHub
-- **Syntax Highlighting** - Support for 50+ languages
-- **File Explorer** - Navigate generated projects easily
-- **Multi-language** - English and Indonesian support
+## 🚀 Key Features
+
+### 🧠 Multi-Agent AI System
+- **12 Specialized Agents**: 
+  - `Planner` (Architect), `Coder` (Implementation), `Reviewer` (QA)
+  - `Designer` (UI/UX), `Guide` (Docs), `Question` (Tutor)
+- **Intelligent Routing**: Automatic model selection (Gemini, OpenAI, Groq) based on complexity.
+- **Self-Healing**: Agents detect errors in generated code and auto-correct them.
+
+### ⚡ Skynet Learning System (Self-Improving)
+The system gets smarter with every interaction:
+1.  **RLHF (Reinforcement Learning)**: Analyzes user feedback (👍/👎) to adjust prompt strategies.
+2.  **Persistent Cache**: 72-hour Supabase-backed cache to survive Vercel cold starts.
+3.  **Proven Patterns**: Automatically promotes successful code patterns to best practices.
+4.  **User Memory**: Remembers your coding style and preferences across sessions.
+
+### 🎨 KilatOS Design System
+A premium, dark-mode-first aesthetic:
+- **Palette**: Royal Purple (`#8B5CF6`) & Deep Obsidian (`#0A0A0B`)
+- **Typography**: Plus Jakarta Sans (Headers) + JetBrains Mono (Code)
+- **Effects**: Glassmorphism, Neon Glows, and smooth micro-interactions
+
+### 💻 Hybrid IDE Experience
+- **Monaco Editor**: Full VS Code experience in the browser.
+- **WebContainer**: Runs Node.js natively in Chrome (no backend required for preview).
+- **Live Preview**: See changes instantly as code generates.
 
 ---
 
@@ -101,24 +143,25 @@ NEXTAUTH_URL=http://localhost:3000
 ```
 KilatOS/
 ├── app/                    # Next.js App Router
-│   ├── api/                # API Routes
-│   ├── kilatcode/          # Code Generation UI
-│   ├── chat/               # Chat Interface
+│   ├── api/                # API Routes (Cron, KilatCode, Auth)
+│   ├── kilatcode/          # IDE Interface (Main App)
+│   ├── chat/               # Standalone Chat Interface
 │   └── admin/              # Admin Dashboard
 ├── components/             # React Components
-│   ├── ui/                 # UI Components
-│   ├── Monaco Editor       # Code Editor
-│   └── WebContainer        # Preview Component
-├── lib/                    # Core Libraries
-│   ├── ai/                 # AI Integration
-│   │   ├── mandor.ts       # AI Request Handler
-│   │   ├── tier-router.ts  # Model Selection
-│   │   └── rate-limiter.ts # Rate Limiting
-│   ├── agents/             # Multi-Agent System
-│   │   ├── codegen/        # Code Generation
-│   │   └── orchestrator/   # Agent Orchestration
-│   └── executor/           # Code Execution
-└── hooks/                  # React Hooks
+│   ├── ui/                 # Design System (Radix UI + Tailwind)
+│   ├── workspace/          # IDE Panels (Explorer, Terminal)
+│   ├── MonacoEditor/       # Code Editor Wrapper
+│   └── WebContainer/       # Live Preview Runtime
+├── lib/                    # Core Business Logic
+│   ├── agents/             # 12 AI Agents (Planner, Coder, etc.)
+│   ├── cache/              # Caching Layer (Persistent + InMemory)
+│   ├── learning/           # Skynet (RLHF, Self-Improve)
+│   ├── memory/             # User & Session Context
+│   ├── orchestrator/       # Mandor AI Gateway
+│   ├── rag/                # RAG & Knowledge Base
+│   └── auth/               # Supabase Auth Helpers
+├── hooks/                  # Custom React Hooks
+└── public/                 # Static Assets
 ```
 
 ---
