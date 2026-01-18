@@ -46,40 +46,58 @@ export async function GET(req: NextRequest) {
         }));
 
         // =====================================================================
-        // FALLBACK: Recover from job_queue if assistant message is missing
-        // This handles cases where addToImmediate silently fails in async route
+        // ALWAYS MERGE FROM JOB_QUEUE
+        // Agent_states may be missing entries due to addToImmediate failures
+        // This ensures all completed jobs are shown regardless of save issues
         // =====================================================================
-        const hasAssistantMessage = messages.some((m: any) => m.role === 'assistant');
+        const { data: jobs } = await supabase
+            .from('job_queue')
+            .select('id, output_content, completed_at, agent_type')
+            .eq('session_id', sessionId)
+            .eq('status', 'completed')
+            .order('completed_at', { ascending: true });
 
-        if (!hasAssistantMessage && messages.length > 0) {
-            console.log('[History API] ⚠️ No assistant messages found - checking job_queue fallback');
+        if (jobs && jobs.length > 0) {
+            // Get existing message IDs to avoid duplicates
+            const existingJobIds = new Set(
+                messages
+                    .filter((m: any) => m.id?.startsWith('job_'))
+                    .map((m: any) => m.id)
+            );
 
-            // Get completed jobs for this session
-            const { data: jobs } = await supabase
-                .from('job_queue')
-                .select('id, output_content, completed_at, agent_type')
-                .eq('session_id', sessionId)
-                .eq('status', 'completed')
-                .order('completed_at', { ascending: true });
+            // Get existing content hashes to detect duplicates by content
+            const existingContents = new Set(
+                messages
+                    .filter((m: any) => m.role === 'assistant')
+                    .map((m: any) => m.content?.substring(0, 100))
+            );
 
-            if (jobs && jobs.length > 0) {
-                console.log(`[History API] 📦 Found ${jobs.length} completed jobs in fallback`);
+            let addedCount = 0;
+            for (const job of jobs) {
+                const jobId = `job_${job.id}`;
+                const contentPreview = job.output_content?.substring(0, 100);
 
-                // Add all completed job outputs as assistant messages
-                for (const job of jobs) {
-                    if (job.output_content) {
-                        messages.push({
-                            id: `job_${job.id}`,
-                            role: 'assistant',
-                            content: job.output_content,
-                            timestamp: job.completed_at,
-                            agent: job.agent_type || 'general',
-                            type: 'text',
-                            from_fallback: true  // Mark as recovered from fallback
-                        });
-                    }
+                // Skip if already added or content already exists
+                if (existingJobIds.has(jobId) || existingContents.has(contentPreview)) {
+                    continue;
                 }
 
+                if (job.output_content) {
+                    messages.push({
+                        id: jobId,
+                        role: 'assistant',
+                        content: job.output_content,
+                        timestamp: job.completed_at,
+                        agent: job.agent_type || 'general',
+                        type: 'text',
+                        from_fallback: true
+                    });
+                    addedCount++;
+                }
+            }
+
+            if (addedCount > 0) {
+                console.log(`[History API] 📦 Recovered ${addedCount} messages from job_queue`);
                 // Re-sort messages by timestamp
                 messages.sort((a, b) =>
                     new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
