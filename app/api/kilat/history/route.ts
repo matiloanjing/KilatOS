@@ -6,7 +6,8 @@ import { createClient } from '@/lib/auth/server';
  * Retrieves conversation history for a specific session ID.
  * 
  * FIX: Directly query agent_states with step_type='context_message'
- * instead of using loadSession() which requires a parent 'sessions' record.
+ * FALLBACK (2026-01-18): If assistant message missing from agent_states,
+ * recover from job_queue to handle silent save failures.
  */
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
@@ -32,15 +33,8 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ success: false, error: error.message }, { status: 500 });
         }
 
-        if (!data || data.length === 0) {
-            console.log('[History API] No messages found for session:', sessionId);
-            return NextResponse.json({ success: true, messages: [] });
-        }
-
-        console.log(`[History API] Found ${data.length} messages for session:`, sessionId);
-
         // Map database records to Frontend Message interface
-        const messages = data.map((item: any, index: number) => ({
+        const messages: any[] = (data || []).map((item: any, index: number) => ({
             id: `hist_${sessionId}_${index}`,
             role: item.state_data?.role || 'user',
             content: item.state_data?.content || '',
@@ -51,9 +45,59 @@ export async function GET(req: NextRequest) {
             type: item.state_data?.metadata?.type || 'text',
         }));
 
+        // =====================================================================
+        // FALLBACK: Recover from job_queue if assistant message is missing
+        // This handles cases where addToImmediate silently fails in async route
+        // =====================================================================
+        const hasAssistantMessage = messages.some((m: any) => m.role === 'assistant');
+
+        if (!hasAssistantMessage && messages.length > 0) {
+            console.log('[History API] ⚠️ No assistant messages found - checking job_queue fallback');
+
+            // Get completed jobs for this session
+            const { data: jobs } = await supabase
+                .from('job_queue')
+                .select('id, output_content, completed_at, agent_type')
+                .eq('session_id', sessionId)
+                .eq('status', 'completed')
+                .order('completed_at', { ascending: true });
+
+            if (jobs && jobs.length > 0) {
+                console.log(`[History API] 📦 Found ${jobs.length} completed jobs in fallback`);
+
+                // Add all completed job outputs as assistant messages
+                for (const job of jobs) {
+                    if (job.output_content) {
+                        messages.push({
+                            id: `job_${job.id}`,
+                            role: 'assistant',
+                            content: job.output_content,
+                            timestamp: job.completed_at,
+                            agent: job.agent_type || 'general',
+                            type: 'text',
+                            from_fallback: true  // Mark as recovered from fallback
+                        });
+                    }
+                }
+
+                // Re-sort messages by timestamp
+                messages.sort((a, b) =>
+                    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                );
+            }
+        }
+
+        if (messages.length === 0) {
+            console.log('[History API] No messages found for session:', sessionId);
+            return NextResponse.json({ success: true, messages: [] });
+        }
+
+        console.log(`[History API] Found ${messages.length} messages for session:`, sessionId);
+
         return NextResponse.json({ success: true, messages });
     } catch (error) {
         console.error('[History API] Error:', error);
         return NextResponse.json({ success: false, error: 'Failed to load history' }, { status: 500 });
     }
 }
+

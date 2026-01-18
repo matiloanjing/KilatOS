@@ -1031,7 +1031,14 @@ ${conversationContext ? `Previous conversation and context:\n${conversationConte
                     console.log(`📁 Saved ${Object.keys(filesObject).length} files to session context`);
                 }
             } catch (error) {
-                console.warn('Failed to save to session memory:', error);
+                // Improved error logging for debugging (2026-01-18)
+                console.error('❌ Failed to save assistant message to session memory:', {
+                    sessionId,
+                    agentType,
+                    error: error instanceof Error ? error.message : String(error),
+                    stack: error instanceof Error ? error.stack : undefined,
+                    contentLength: outputContent?.length
+                });
             }
         }
 
