@@ -16,7 +16,29 @@
  */
 
 import { aiMandor } from '@/lib/ai/mandor';
-import { testExecutor, type TestExecutionResult, type GeneratedTest } from '@/lib/agents/codegen/test-executor';
+
+// Optional: Test Executor (may be disabled to avoid build timeouts)
+// Types inline since module may not exist
+export interface GeneratedTest {
+    name: string;
+    code: string;
+    type: 'unit' | 'integration' | 'e2e';
+}
+export interface TestExecutionResult {
+    passed: boolean;
+    tests: Array<{ name: string; passed: boolean; error?: string }>;
+    coverage?: number;
+}
+let testExecutor: any = null;
+try {
+    import('@/lib/agents/codegen/test-executor').then(module => {
+        testExecutor = module.testExecutor;
+    }).catch(() => {
+        console.warn('⚠️ Test executor not available (disabled for build optimization)');
+    });
+} catch {
+    console.warn('⚠️ Test executor disabled');
+}
 
 // =====================================================
 // TYPES

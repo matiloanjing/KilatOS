@@ -46,8 +46,19 @@ import { documentSegmenter } from './document-segmenter';
 import { planningAgent, CodePlan } from './planning-agent';
 import { referenceAgent, ReferenceSearchResult } from './reference-agent';
 import { responseCache } from './response-cache';
-import { testExecutor } from './test-executor';
 
+// Optional: Test Executor (may be disabled to avoid build timeouts)
+let testExecutor: any = null;
+try {
+    // Dynamic import to avoid build failures when file is gitignored
+    import('./test-executor').then(module => {
+        testExecutor = module.testExecutor;
+    }).catch(() => {
+        console.warn('⚠️ Test executor not available (disabled for build optimization)');
+    });
+} catch {
+    console.warn('⚠️ Test executor disabled');
+}
 
 // ============================================================================
 // Types (Internal - Advanced Backend)
