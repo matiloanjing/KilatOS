@@ -9,6 +9,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { useQuota } from '@/hooks/useQuota';
 import IconNav from '@/components/ui/IconNav';
 import { ChatPanel } from '@/components/ui/ChatPanel';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
@@ -32,7 +33,7 @@ export default function KilatAuditPage({ params }: PageProps) {
     const [projectName, setProjectName] = useState('code-audit');
     const [auditResults, setAuditResults] = useState<AuditResult[]>([]);
     const [repoUrl, setRepoUrl] = useState('');
-    const [quota, setQuota] = useState({ used: 0, limit: 100, tier: 'free' });
+    const [quota] = useQuota(user?.id, 'code');
     const [isChatCollapsed, setIsChatCollapsed] = useState(false);
     const [activeTab, setActiveTab] = useState<'overview' | 'security' | 'quality'>('overview');
     const [suggestions, setSuggestions] = useState<AgentSuggestion[]>([]);
@@ -49,7 +50,7 @@ export default function KilatAuditPage({ params }: PageProps) {
         } catch (e) { console.error('Load failed:', e); }
     };
 
-    useEffect(() => { if (user) fetch('/api/models').then(r => r.json()).then(data => { if (data.success) { setAvailableModels(data.models); setQuota(prev => ({ ...prev, tier: data.userTier })); if (data.selected) setSelectedModel(data.selected); } }); }, [user]);
+    useEffect(() => { if (user) fetch('/api/models').then(r => r.json()).then(data => { if (data.success) { setAvailableModels(data.models); if (data.selected) setSelectedModel(data.selected); } }); }, [user]);
     useEffect(() => { if (!loading && !user) router.push('/login'); }, [user, loading, router]);
 
     // Post-Task Suggestions
@@ -90,7 +91,7 @@ export default function KilatAuditPage({ params }: PageProps) {
 
     const handleNewProject = useCallback(() => router.push(`/kilataudit/c/${crypto.randomUUID()}`), [router]);
     const handleProjectSelect = (id: string) => router.push(`/kilataudit/c/${id}`);
-    
+
     // AI Learning: Feedback handler
     const handleFeedback = useCallback(async (messageId: string, rating: 'good' | 'bad') => {
         try {

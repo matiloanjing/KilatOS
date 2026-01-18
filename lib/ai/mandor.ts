@@ -33,9 +33,12 @@ export interface AIMandorRequest {
     preferredModel?: string; // Force specific model (e.g. 'qwen-coder')
     model?: string;  // Alias for preferredModel (backward compat)
     userPlan?: 'free' | 'pro' | 'enterprise'; // Business Logic: Strict Plan Enforcement
-    userId?: string;  // NEW: User ID for tier detection and quota tracking
-    priority?: 'low' | 'medium' | 'high';
+    userId?: string;  // User ID for tier detection and quota tracking
+    sessionId?: string;  // Session ID for tracking
+    agentType?: string;  // Agent type for tracking (e.g., 'codegen', 'solve', 'image')
+    priority?: 'low' | 'normal' | 'high';
     timeout?: number;
+    maxTokens?: number;  // Max tokens for quota tracking
     validateQuality?: boolean;
     enableThinking?: boolean; // Use prompt-based CoT (safer, works with all models)
 }
@@ -175,13 +178,13 @@ Return as JSON with all files:
 
         // Default values
         request.complexity = request.complexity || 'medium';
-        request.priority = request.priority || 'medium';
+        request.priority = request.priority || 'normal';
         request.validateQuality = request.validateQuality ?? true;
 
         // Add to queue and execute
         return this.enqueue(
             () => this.executeRequest(request),
-            this.getPriorityValue(request.priority)
+            this.getPriorityValue(request.priority!)
         );
     }
 
@@ -381,7 +384,7 @@ Return as JSON with all files:
                     : undefined
             );
 
-            // Track usage
+            // Track usage (in-memory)
             this.tierRouter.trackUsage(tier);
 
             // Update stats
@@ -391,6 +394,39 @@ Return as JSON with all files:
                 (this.stats.averageLatency * (this.stats.successfulRequests - 1) + duration) /
                 this.stats.successfulRequests;
             this.stats.costToday += tierConfig.costPerRequest * attempts;
+
+            // ====== CRITICAL: Track to DATABASE for comprehensive logging ======
+            // This ensures ALL aiMandor.call() are tracked, not just individual callsites
+            try {
+                const { usageTracker } = await import('@/lib/tracking/usage-tracker');
+                await usageTracker.logUsage({
+                    userId: request.userId || undefined,
+                    sessionId: request.sessionId || undefined,
+                    agentType: request.agentType || 'mandor-generic',
+                    agentVersion: '2.0',
+                    taskInput: request.prompt.substring(0, 500), // Truncate for storage
+                    taskComplexity: request.priority === 'high' ? 'heavy' : request.priority === 'low' ? 'light' : 'medium',
+                    taskCategory: request.agentType || 'text',
+                    baseTemplateUsed: 'mandor-call',
+                    enhancementsApplied: [],
+                    qualityChecksRun: request.validateQuality ? ['quality-validation'] : [],
+                    aiProvider: tierConfig.model.includes('llama') || tierConfig.model.includes('mixtral') ? 'groq' : 'gemini',
+                    modelUsed: tierConfig.model,
+                    priority: request.priority || 'normal',
+                    success: true,
+                    outputText: result.substring(0, 1000), // Truncate output
+                    qualityScore: 1.0,
+                    validationPassed: true,
+                    latencyMs: duration,
+                    tokensInput: request.prompt.length * 0.25, // Estimate
+                    tokensOutput: result.length * 0.25, // Estimate
+                    costUsd: tierConfig.costPerRequest * attempts,
+                    retries: attempts - 1
+                });
+            } catch (trackError) {
+                // Don't fail the request if tracking fails
+                console.warn('⚠️ [AIMandor] Usage tracking failed:', trackError);
+            }
 
             return {
                 result,

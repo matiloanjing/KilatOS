@@ -334,7 +334,10 @@ export async function getTierLimitsDynamic(tier: UserTier): Promise<typeof TIER_
             contextWindow: settings.contextWindow,
             rateLimit: settings.rateLimit,
             maxSessionMessages: settings.maxSessionMessages,
-            maxSessions: TIER_LIMITS[tier].maxSessions, // Use hardcoded fallback
+            maxSessions: TIER_LIMITS[tier].maxSessions,
+            semanticCacheLimit: TIER_LIMITS[tier].semanticCacheLimit,
+            responseCacheLimit: TIER_LIMITS[tier].responseCacheLimit,
+            prefetchEnabled: TIER_LIMITS[tier].prefetchEnabled,
         };
     } catch (error) {
         console.warn('[user-tier] DynamicConfig unavailable, using fallback');

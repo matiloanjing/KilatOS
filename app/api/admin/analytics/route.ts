@@ -58,6 +58,13 @@ export async function GET(request: NextRequest) {
             .from('admin_agent_stats')
             .select('*');
 
+        // Get modality stats (text/image/audio breakdown)
+        const { data: modalityStats } = await supabase
+            .from('admin_modality_stats')
+            .select('*')
+            .order('date', { ascending: false })
+            .limit(30);
+
         // Calculate summary
         const today = dailyStats?.[0] || {};
         const summary = {
@@ -74,7 +81,8 @@ export async function GET(request: NextRequest) {
             dailyStats,
             modelStats,
             tierBreakdown,
-            agentStats
+            agentStats,
+            modalityStats
         });
 
     } catch (error) {

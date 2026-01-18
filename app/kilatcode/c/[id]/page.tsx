@@ -16,6 +16,7 @@
 import { useState, useCallback, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { useQuota } from '@/hooks/useQuota';
 import IconNav from '@/components/ui/IconNav';
 import { ChatPanel } from '@/components/ui/ChatPanel';
 import WorkspacePanel from '@/components/WorkspacePanel';
@@ -64,8 +65,8 @@ export default function KilatCodePage({ params }: PageProps) {
     const [isExplorerCollapsed, setIsExplorerCollapsed] = useState(false);
     const [activeFile, setActiveFile] = useState<string | null>(null);
 
-    // Quota State
-    const [quota, setQuota] = useState({ used: 0, limit: 100, tier: 'free' });
+    // Quota State - using useQuota hook for automatic fetching
+    const [quota] = useQuota(user?.id, 'code');
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     // Post-Task Suggestions (Cross-Agent Workflow)
@@ -165,7 +166,7 @@ export default function KilatCodePage({ params }: PageProps) {
                 const data = await res.json();
                 if (data.success) {
                     setAvailableModels(data.models);
-                    setQuota(prev => ({ ...prev, tier: data.userTier }));
+                    // Note: tier is handled by useQuota hook via /api/kilat/usage
 
                     if (data.selected) {
                         setSelectedModel(data.selected);
@@ -297,7 +298,7 @@ export default function KilatCodePage({ params }: PageProps) {
                         }
                     }
 
-                    setQuota(prev => ({ ...prev, used: prev.used + 1 }));
+                    // Note: quota.used is fetched by useQuota hook from /api/kilat/usage
                 } else if (job?.status === 'failed') {
                     throw new Error(job.error || 'Job failed');
                 } else {

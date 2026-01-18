@@ -7,6 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { useQuota } from '@/hooks/useQuota';
 import IconNav from '@/components/ui/IconNav';
 import { ChatPanel } from '@/components/ui/ChatPanel';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
@@ -29,7 +30,7 @@ export default function KilatResearchPage({ params }: PageProps) {
     const [availableModels, setAvailableModels] = useState<any[]>([]);
     const [projectName, setProjectName] = useState('research');
     const [citations, setCitations] = useState<Citation[]>([]);
-    const [quota, setQuota] = useState({ used: 0, limit: 100, tier: 'free' });
+    const [quota] = useQuota(user?.id, 'code');
     const [isChatCollapsed, setIsChatCollapsed] = useState(false);
     const [suggestions, setSuggestions] = useState<AgentSuggestion[]>([]);
 
@@ -44,7 +45,7 @@ export default function KilatResearchPage({ params }: PageProps) {
         } catch (e) { console.error('Load failed:', e); }
     };
 
-    useEffect(() => { if (user) fetch('/api/models').then(r => r.json()).then(data => { if (data.success) { setAvailableModels(data.models); setQuota(prev => ({ ...prev, tier: data.userTier })); if (data.selected) setSelectedModel(data.selected); } }); }, [user]);
+    useEffect(() => { if (user) fetch('/api/models').then(r => r.json()).then(data => { if (data.success) { setAvailableModels(data.models); if (data.selected) setSelectedModel(data.selected); } }); }, [user]);
     useEffect(() => { if (!loading && !user) router.push('/login'); }, [user, loading, router]);
 
     // Post-Task Suggestions
@@ -80,7 +81,7 @@ export default function KilatResearchPage({ params }: PageProps) {
     }, [isProcessing, projectId, selectedModel, user?.id]);
 
     const handleNewProject = useCallback(() => router.push(`/kilatresearch/c/${crypto.randomUUID()}`), [router]);
-    
+
     // AI Learning: Feedback handler
     const handleFeedback = useCallback(async (messageId: string, rating: 'good' | 'bad') => {
         try {

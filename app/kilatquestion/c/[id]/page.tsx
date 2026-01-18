@@ -7,6 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { useQuota } from '@/hooks/useQuota';
 import IconNav from '@/components/ui/IconNav';
 import { ChatPanel } from '@/components/ui/ChatPanel';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
@@ -31,7 +32,7 @@ export default function KilatQuestionPage({ params }: PageProps) {
     const [questions, setQuestions] = useState<Question[]>([]);
     const [activeQ, setActiveQ] = useState(0);
     const [showAnswer, setShowAnswer] = useState(false);
-    const [quota, setQuota] = useState({ used: 0, limit: 100, tier: 'free' });
+    const [quota] = useQuota(user?.id, 'code');
     const [isChatCollapsed, setIsChatCollapsed] = useState(false);
     const [suggestions, setSuggestions] = useState<AgentSuggestion[]>([]);
 
@@ -46,7 +47,7 @@ export default function KilatQuestionPage({ params }: PageProps) {
         } catch (e) { console.error('Load failed:', e); }
     };
 
-    useEffect(() => { if (user) fetch('/api/models').then(r => r.json()).then(data => { if (data.success) { setAvailableModels(data.models); setQuota(prev => ({ ...prev, tier: data.userTier })); if (data.selected) setSelectedModel(data.selected); } }); }, [user]);
+    useEffect(() => { if (user) fetch('/api/models').then(r => r.json()).then(data => { if (data.success) { setAvailableModels(data.models); if (data.selected) setSelectedModel(data.selected); } }); }, [user]);
     useEffect(() => { if (!loading && !user) router.push('/login'); }, [user, loading, router]);
 
     // Post-Task Suggestions
@@ -84,7 +85,7 @@ export default function KilatQuestionPage({ params }: PageProps) {
     const handleNewProject = useCallback(() => router.push(`/kilatquestion/c/${crypto.randomUUID()}`), [router]);
     const handleNext = () => { if (activeQ < questions.length - 1) { setActiveQ(p => p + 1); setShowAnswer(false); } };
     const handlePrev = () => { if (activeQ > 0) { setActiveQ(p => p - 1); setShowAnswer(false); } };
-    
+
     // AI Learning: Feedback handler
     const handleFeedback = useCallback(async (messageId: string, rating: 'good' | 'bad') => {
         try {

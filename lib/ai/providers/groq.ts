@@ -98,15 +98,20 @@ export class GroqProvider {
      * 
      * @param audioFile - Audio file (mp3, wav, m4a, etc.)
      * @param language - Optional language code (e.g., 'id' for Indonesian)
+     * @param userId - Optional user ID for tracking
+     * @param sessionId - Optional session ID for tracking
      */
     async transcribe(
         audioFile: File | Blob,
-        language?: string
+        language?: string,
+        userId?: string,
+        sessionId?: string
     ): Promise<{ text: string; language: string; duration: number }> {
         if (!this.apiKey) {
             throw new Error('Groq API key not configured');
         }
 
+        const startTime = Date.now();
         const formData = new FormData();
         formData.append('file', audioFile);
         formData.append('model', 'whisper-large-v3');
@@ -128,6 +133,38 @@ export class GroqProvider {
         }
 
         const data = await response.json();
+        const latencyMs = Date.now() - startTime;
+
+        // Track audio transcription usage
+        try {
+            const { usageTracker } = await import('@/lib/tracking/usage-tracker');
+            await usageTracker.logUsage({
+                userId: userId || undefined,
+                sessionId: sessionId || undefined,
+                agentType: 'audio-transcription',
+                agentVersion: '1.0',
+                taskInput: `Audio file (${audioFile instanceof File ? audioFile.name : 'blob'})`,
+                taskComplexity: 'medium',
+                taskCategory: 'transcription',
+                baseTemplateUsed: 'whisper-transcribe',
+                enhancementsApplied: [],
+                qualityChecksRun: [],
+                aiProvider: 'groq',
+                modelUsed: 'whisper-large-v3',
+                priority: 'normal',
+                success: true,
+                outputText: data.text,
+                qualityScore: 1.0,
+                validationPassed: true,
+                latencyMs,
+                tokensInput: 0, // Audio doesn't use tokens
+                tokensOutput: data.text?.length || 0,
+                costUsd: 0.006 * (data.duration || 60) / 60 // ~$0.006/min for Whisper
+            });
+            console.log(`✅ Audio transcription tracked: ${latencyMs}ms, ${data.duration}s audio`);
+        } catch (trackError) {
+            console.warn('Failed to track audio usage:', trackError);
+        }
 
         return {
             text: data.text,

@@ -7,6 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { useQuota } from '@/hooks/useQuota';
 import IconNav from '@/components/ui/IconNav';
 import { ChatPanel } from '@/components/ui/ChatPanel';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
@@ -29,7 +30,7 @@ export default function KilatCrawlPage({ params }: PageProps) {
     const [availableModels, setAvailableModels] = useState<any[]>([]);
     const [projectName, setProjectName] = useState('scraper');
     const [results, setResults] = useState<ScrapeResult[]>([]);
-    const [quota, setQuota] = useState({ used: 0, limit: 100, tier: 'free' });
+    const [quota] = useQuota(user?.id, 'code');
     const [isChatCollapsed, setIsChatCollapsed] = useState(false);
     const [suggestions, setSuggestions] = useState<AgentSuggestion[]>([]);
 
@@ -44,7 +45,7 @@ export default function KilatCrawlPage({ params }: PageProps) {
         } catch (e) { console.error('Load failed:', e); }
     };
 
-    useEffect(() => { if (user) fetch('/api/models').then(r => r.json()).then(data => { if (data.success) { setAvailableModels(data.models); setQuota(prev => ({ ...prev, tier: data.userTier })); if (data.selected) setSelectedModel(data.selected); } }); }, [user]);
+    useEffect(() => { if (user) fetch('/api/models').then(r => r.json()).then(data => { if (data.success) { setAvailableModels(data.models); if (data.selected) setSelectedModel(data.selected); } }); }, [user]);
     useEffect(() => { if (!loading && !user) router.push('/login'); }, [user, loading, router]);
 
     // Post-Task Suggestions
@@ -81,7 +82,7 @@ export default function KilatCrawlPage({ params }: PageProps) {
 
     const handleNewProject = useCallback(() => router.push(`/kilatcrawl/c/${crypto.randomUUID()}`), [router]);
     const handleExport = () => { const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'crawl-data.json'; a.click(); };
-    
+
     // AI Learning: Feedback handler
     const handleFeedback = useCallback(async (messageId: string, rating: 'good' | 'bad') => {
         try {

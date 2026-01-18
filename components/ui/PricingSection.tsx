@@ -33,11 +33,11 @@ export function PricingSection() {
                 }
             } catch (err) {
                 console.error('Failed to fetch pricing:', err);
-                // Fallback data
+                // Fallback data - MUST match database tier_limits!
                 setTiers([
-                    { tier: 'free', name: 'Free', price: 0, period: 'forever', limits: { codeDaily: 100, codeMonthly: 3000, imageDaily: 50, imageMonthly: 1500, maxDailyCost: 0.20 }, features: ['Basic AI agents', 'Community support', 'Standard models'] },
-                    { tier: 'pro', name: 'Pro', price: 29, period: 'month', limits: { codeDaily: 500, codeMonthly: 15000, imageDaily: 500, imageMonthly: 15000, maxDailyCost: 1.0 }, features: ['All AI agents', 'Priority support', 'Premium models', 'RAG search', 'Custom knowledge base'] },
-                    { tier: 'enterprise', name: 'Enterprise', price: 149, period: 'month', limits: { codeDaily: 2500, codeMonthly: 75000, imageDaily: 2000, imageMonthly: 60000, maxDailyCost: 5.0 }, features: ['Everything in Pro', 'Dedicated support', 'Enterprise models', 'Team collaboration', 'Custom integrations', 'SLA guarantee'] },
+                    { tier: 'free', name: 'Free', price: 0, period: 'forever', limits: { codeDaily: 50, codeMonthly: 1500, imageDaily: 20, imageMonthly: 600, maxDailyCost: 0.50 }, features: ['Basic AI agents', 'Community support', 'Standard models'] },
+                    { tier: 'pro', name: 'Pro', price: 29, period: 'month', limits: { codeDaily: 500, codeMonthly: 15000, imageDaily: 300, imageMonthly: 9000, maxDailyCost: 2.0 }, features: ['All AI agents', 'Priority support', 'Premium models', 'RAG search', 'Custom knowledge base'] },
+                    { tier: 'enterprise', name: 'Enterprise', price: 149, period: 'month', limits: { codeDaily: 5000, codeMonthly: 150000, imageDaily: 2000, imageMonthly: 60000, maxDailyCost: 25.0 }, features: ['Everything in Pro', 'Dedicated support', 'Enterprise models', 'Team collaboration', 'Custom integrations', 'SLA guarantee'] },
                 ]);
             }
             setLoading(false);

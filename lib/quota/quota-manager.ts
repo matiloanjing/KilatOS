@@ -108,8 +108,57 @@ class QuotaManager {
      * agent_id in tier_limits is usually 'code' or 'image'
      */
     private mapAgentToCategory(agentId: string): string {
-        if (['image', 'flux', 'ideagen'].includes(agentId)) return 'image';
+        if (['image', 'flux', 'ideagen', 'kilatimage', 'imagegen'].includes(agentId)) return 'image';
+        if (['audio-transcription', 'whisper'].includes(agentId)) return 'audio';
         return 'code'; // Default to code limit for solve, write, research, etc.
+    }
+
+    /**
+     * Check if user has exceeded their daily cost budget
+     * Uses max_daily_cost_usd from tier_limits table
+     */
+    async checkCostBudget(
+        userId: string,
+        agentId: string = 'code'
+    ): Promise<{ exceeded: boolean; spent: number; limit: number; remaining: number }> {
+        const today = this.getTodayDate();
+
+        // 1. Get user tier
+        const { getUserTier } = await import('@/lib/auth/user-tier');
+        const tier = await getUserTier(userId);
+
+        // 2. Get cost limit from tier_limits
+        const category = this.mapAgentToCategory(agentId);
+        const { data: limitData } = await supabase
+            .from('tier_limits')
+            .select('max_daily_cost_usd')
+            .eq('tier', tier)
+            .eq('agent_id', category)
+            .single();
+
+        // Fallback limits if not found
+        const costLimit = parseFloat(limitData?.max_daily_cost_usd) ||
+            (tier === 'free' ? 0.50 : tier === 'pro' ? 2.00 : 25.00);
+
+        // 3. Get today's total cost from agent_usage_logs
+        const { data: costData } = await supabase
+            .from('agent_usage_logs')
+            .select('cost_usd')
+            .eq('user_id', userId)
+            .gte('created_at', `${today}T00:00:00`)
+            .lte('created_at', `${today}T23:59:59`);
+
+        const spent = costData?.reduce((sum, row) => sum + (parseFloat(row.cost_usd) || 0), 0) || 0;
+        const remaining = Math.max(0, costLimit - spent);
+
+        console.log(`💰 [CostBudget] User ${userId.substring(0, 8)}... spent $${spent.toFixed(4)} / $${costLimit.toFixed(2)}`);
+
+        return {
+            exceeded: spent >= costLimit,
+            spent,
+            limit: costLimit,
+            remaining
+        };
     }
 
     /**

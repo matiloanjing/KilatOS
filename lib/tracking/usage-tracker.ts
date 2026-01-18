@@ -115,35 +115,50 @@ export class UsageTracker {
             let finalCost = data.costUsd || 0;
 
             if (finalCost === 0 && data.modelUsed) {
-                // Pricing Map (Estimates based on public pricing per 1M tokens / req)
-                const PRICING: Record<string, { in?: number, out?: number, req?: number }> = {
-                    'gemini-fast': { in: 0.075, out: 0.30 }, // Flash
-                    'gemini-1.5-flash': { in: 0.075, out: 0.30 },
-                    'gemini-1.5-pro': { in: 3.50, out: 10.50 },
-                    'gemini-2.0-flash-exp': { in: 0.0, out: 0.0 }, // Free preview
-                    'gpt-4o': { in: 2.50, out: 10.00 },
-                    'gpt-4o-mini': { in: 0.15, out: 0.60 },
-                    'claude-3-5-sonnet': { in: 3.00, out: 15.00 },
-                    'qwen-coder': { in: 0.40, out: 0.40 }, // Approx
+                // Fetch pricing from llm_models database (DYNAMIC - not hardcoded!)
+                try {
+                    const { data: modelData } = await this.supabase
+                        .from('llm_models')
+                        .select('cost_per_request, input_cost_per_m, output_cost_per_m, model_type')
+                        .or(`model_id.ilike.%${data.modelUsed}%,display_name.ilike.%${data.modelUsed}%`)
+                        .limit(1)
+                        .single();
 
-                    // Image Models (Per Request)
-                    'flux': { req: 0.04 },
-                    'flux-schnell': { req: 0.04 },
-                    'pollination-paid': { req: 0.04 }
-                };
+                    if (modelData) {
+                        if (modelData.model_type === 'image') {
+                            // Image models: use cost_per_request
+                            finalCost = parseFloat(modelData.cost_per_request) || 0;
+                        } else {
+                            // Text models: calculate from input/output tokens
+                            const inputCostPerM = parseFloat(modelData.input_cost_per_m) || 0;
+                            const outputCostPerM = parseFloat(modelData.output_cost_per_m) || 0;
 
-                const modelKey = Object.keys(PRICING).find(k => data.modelUsed.includes(k) || k.includes(data.modelUsed));
-                if (modelKey) {
-                    const price = PRICING[modelKey];
-                    if (price.req) {
-                        finalCost = price.req;
+                            const inTokens = data.tokensInput || (data.taskInput?.length || 0) * 0.25;
+                            const outTokens = data.tokensOutput || (data.outputText?.length || 0) * 0.25;
+
+                            finalCost = ((inTokens / 1_000_000) * inputCostPerM) +
+                                ((outTokens / 1_000_000) * outputCostPerM);
+
+                            // Minimum cost per request if token-based is 0
+                            if (finalCost === 0) {
+                                finalCost = parseFloat(modelData.cost_per_request) || 0;
+                            }
+                        }
+                    }
+                } catch (dbError) {
+                    // Fallback: estimate based on model name patterns
+                    console.warn('⚠️ [UsageTracker] Failed to fetch model pricing from DB:', dbError);
+
+                    // Basic fallback estimates (only used if DB fails)
+                    if (data.modelUsed.includes('flux') || data.modelUsed.includes('image')) {
+                        finalCost = 0.04; // Image default
+                    } else if (data.modelUsed.includes('groq') || data.modelUsed.includes('llama')) {
+                        finalCost = 0; // Groq is free
                     } else {
-                        // Estimate tokens if missing (1 char ~= 0.25 token)
+                        // Estimate for text models: ~$0.075 per 1M input, ~$0.30 per 1M output
                         const inTokens = data.tokensInput || (data.taskInput?.length || 0) * 0.25;
                         const outTokens = data.tokensOutput || (data.outputText?.length || 0) * 0.25;
-
-                        finalCost = ((inTokens / 1_000_000) * (price.in || 0)) +
-                            ((outTokens / 1_000_000) * (price.out || 0));
+                        finalCost = ((inTokens / 1_000_000) * 0.075) + ((outTokens / 1_000_000) * 0.30);
                     }
                 }
             }

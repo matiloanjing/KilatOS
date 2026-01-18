@@ -317,6 +317,64 @@ ${codeExamples}
     }
 }
 
+/**
+ * Sync test results back to learning system
+ * Helps AI understand what patterns lead to passing/failing tests
+ */
+export async function syncTestResultsToLearning(
+    userQuery: string,
+    testResults: {
+        success: boolean;
+        passed: number;
+        failed: number;
+        total: number;
+        issues?: string[];
+    },
+    generatedFiles: Record<string, string>
+): Promise<boolean> {
+    try {
+        const rag = new EnhancedRAG();
+
+        // Get main code file
+        const appCode = generatedFiles['App.tsx'] || generatedFiles['src/App.tsx'] || '';
+        const codeSnippet = appCode.substring(0, 1000);
+
+        // Create learning document
+        const documentText = `
+User Request: ${userQuery}
+
+Test Results:
+- Passed: ${testResults.passed}/${testResults.total}
+- Success: ${testResults.success ? 'YES' : 'NO'}
+${testResults.issues?.length ? `- Issues: ${testResults.issues.join(', ')}` : ''}
+
+Code Pattern:
+\`\`\`tsx
+${codeSnippet}
+\`\`\`
+        `.trim();
+
+        await rag.addDocument({
+            kb_id: 'kb_codegen',
+            text: documentText,
+            metadata: {
+                type: 'test_results',
+                success: testResults.success,
+                pass_rate: testResults.total > 0 ? testResults.passed / testResults.total : 0,
+                synced_at: new Date().toISOString()
+            },
+            chunk_size: 512
+        });
+
+        console.log(`🧪 [RAG Learning] Synced test results: ${testResults.passed}/${testResults.total}`);
+        return true;
+
+    } catch (error) {
+        console.error('[RAG Learning] Failed to sync test results:', error);
+        return false;
+    }
+}
+
 export default {
     agenticRAG,
     ragForDesign,
@@ -325,5 +383,6 @@ export default {
     ragForGuide,
     formatRAGContext,
     syncGeneratedCodeToKB,
+    syncTestResultsToLearning,
     AGENT_KB_MAP
 };

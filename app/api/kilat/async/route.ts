@@ -35,7 +35,7 @@ import { generateIdeas } from '@/lib/agents/ideagen/orchestrator';
 import { KilatCrawler } from '@/lib/agents/crawl/kilatcrawl';
 import { generateImages } from '@/lib/agents/imagegen/orchestrator';
 // Audit and Docs agents
-import { analyzeRepository, generateFixes } from '@/lib/github/analyzer';
+import { analyzeRepository, analyzeLocalFiles, generateFixes } from '@/lib/github/analyzer';
 import { createGitHubClient } from '@/lib/github/client';
 import { generateDocumentation } from '@/lib/agents/codegen/modes/documentation';
 // Agent Persona Prompts
@@ -768,24 +768,27 @@ ${conversationContext ? `Previous conversation:\n${conversationContext}\n\n` : '
 
                 // =====================================================================
                 // AUDIT AGENT - GitHub repository analysis (Jules-style)
+                // Also supports auditing local files from session context
                 // =====================================================================
                 case 'audit':
                     console.log('🔍 Routing to Audit Agent');
-                    await jobQueue.updateJob(jobId, { progress: 20, currentStep: '🔍 Analyzing repository...' });
+                    await jobQueue.updateJob(jobId, { progress: 20, currentStep: '🔍 Analyzing code...' });
 
                     // Parse GitHub URL from message
                     const repoMatch = message.match(/github\.com\/([^\/]+)\/([^\/\s]+)/);
-                    if (!repoMatch) {
-                        outputContent = '❌ Please provide a valid GitHub repository URL (e.g., `https://github.com/owner/repo`)';
-                    } else {
+
+                    // Check if we have local files from session context (from KilatCode)
+                    const contextFiles = crossAgentContext?.files || null;
+
+                    if (repoMatch) {
+                        // GitHub Repository Audit
                         const [, owner, repo] = repoMatch;
-                        // Note: For full functionality, need GitHub OAuth token from session
-                        // This basic version uses public repo analysis
                         try {
                             const githubClient = createGitHubClient(process.env.GITHUB_TOKEN || '');
                             specializedResult = await analyzeRepository(githubClient, owner, repo.replace('.git', ''), {
                                 checks: ['security', 'performance', 'bugs', 'style'],
-                                maxFiles: 30
+                                maxFiles: 30,
+                                model: selectedModel
                             });
 
                             const issuesList = specializedResult.issues.slice(0, 20).map((issue: any, i: number) =>
@@ -797,6 +800,27 @@ ${conversationContext ? `Previous conversation:\n${conversationContext}\n\n` : '
                         } catch (auditError) {
                             outputContent = `❌ Audit failed: ${auditError instanceof Error ? auditError.message : 'Unknown error'}. Make sure the repository is public or you're logged in with GitHub.`;
                         }
+                    } else if (contextFiles && Object.keys(contextFiles).length > 0) {
+                        // Local Files Audit (from KilatCode or session)
+                        console.log('   📁 Auditing local files from context...');
+                        try {
+                            specializedResult = await analyzeLocalFiles(contextFiles, {
+                                checks: ['security', 'performance', 'bugs', 'style'],
+                                model: selectedModel,
+                                projectName: 'kilatcode-project'
+                            });
+
+                            const issuesList = specializedResult.issues.slice(0, 20).map((issue: any, i: number) =>
+                                `${i + 1}. **[${issue.severity.toUpperCase()}]** ${issue.file}:${issue.line || '?'}\n   ${issue.message}`
+                            ).join('\n\n');
+
+                            outputContent = `# 🔍 Local Code Audit Report\n\n## Summary\n- Files analyzed: ${specializedResult.repository.filesAnalyzed}\n- Errors: ${specializedResult.summary.errors}\n- Warnings: ${specializedResult.summary.warnings}\n- Info: ${specializedResult.summary.info}\n\n## Issues Found\n\n${issuesList || 'No issues found! ✨'}`;
+                            filesObject = { 'audit-report.json': JSON.stringify(specializedResult, null, 2) };
+                        } catch (auditError) {
+                            outputContent = `❌ Local audit failed: ${auditError instanceof Error ? auditError.message : 'Unknown error'}`;
+                        }
+                    } else {
+                        outputContent = '❌ Please provide a valid GitHub repository URL (e.g., `https://github.com/owner/repo`) or switch from a KilatCode session that has generated files to audit.';
                     }
                     break;
 

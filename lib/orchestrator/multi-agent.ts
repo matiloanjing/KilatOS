@@ -48,7 +48,7 @@ import { suggestAgentsAsync, shouldAutoExecute, type AgentSuggestion } from '@/l
 
 // Self-Learning System (Skynet!)
 import { buildEnhancedPrompt, learnFromResponse } from '@/lib/learning/self-improve';
-import { agenticRAG, formatRAGContext, syncGeneratedCodeToKB } from '@/lib/rag/agent-rag';
+import { agenticRAG, formatRAGContext, syncGeneratedCodeToKB, syncTestResultsToLearning } from '@/lib/rag/agent-rag';
 
 // Language Rules for multi-language support
 import { LANGUAGE_RULES } from '@/lib/prompts/templates';
@@ -287,7 +287,8 @@ export class MultiAgentOrchestrator {
                 merged.files,
                 userRequest,
                 plan.projectName,
-                userId
+                userId,
+                selectedModel
             );
 
             console.log(`   ✅ [FinalVerifier] Verified: ${Object.keys(verificationResult.files).length} files`);
@@ -309,6 +310,15 @@ export class MultiAgentOrchestrator {
 
             // AI LEARNING: Sync generated code to KB for future RAG examples
             fireAndForget(() => syncGeneratedCodeToKB(userRequest, verificationResult.files, 'codegen'));
+
+            // AI LEARNING: Sync test results if available
+            if (verificationResult.testResults) {
+                fireAndForget(() => syncTestResultsToLearning(
+                    userRequest,
+                    verificationResult.testResults!,
+                    verificationResult.files
+                ));
+            }
 
             return finalResult;
 
@@ -570,10 +580,16 @@ export class MultiAgentOrchestrator {
                 console.warn('   ⚠️ [Fast] RAG skipped:', ragError);
             }
 
-            // Check Quota
+            // Check Quota (request count)
             const quota = await quotaManager.checkQuota(userId, 'fast-mode');
             if (quota.isExceeded) {
                 throw new Error(`Quota exceeded for fast-mode. Limit: ${quota.limit}, Used: ${quota.used}`);
+            }
+
+            // Check Cost Budget ($ spent)
+            const costBudget = await quotaManager.checkCostBudget(userId, 'fast-mode');
+            if (costBudget.exceeded) {
+                throw new Error(`Daily cost budget exceeded. Spent: $${costBudget.spent.toFixed(4)}, Limit: $${costBudget.limit.toFixed(2)}`);
             }
 
             // Track action
@@ -733,7 +749,8 @@ AFTER COMPLETING THE TASK, always end with Next Steps section:
                 files,
                 userRequest,
                 projectName,
-                userId
+                userId,
+                selectedModel
             );
 
             const finalResult = {
@@ -759,6 +776,15 @@ AFTER COMPLETING THE TASK, always end with Next Steps section:
             // AI LEARNING: Sync generated code to KB for future RAG examples
             fireAndForget(() => syncGeneratedCodeToKB(userRequest, files, 'fast-mode'));
             console.log('   💾 [Fast] Response cached + KB synced for AI learning.');
+
+            // AI LEARNING: Sync test results if available
+            if (verificationResult.testResults) {
+                fireAndForget(() => syncTestResultsToLearning(
+                    userRequest,
+                    verificationResult.testResults!,
+                    verificationResult.files
+                ));
+            }
 
             return finalResult;
 
@@ -908,10 +934,16 @@ Return JSON ONLY (no markdown):
             console.log(`      🤖 [${task.agent}] Starting: ${task.description.substring(0, 40)}...`);
         }
 
-        // Check Quota
+        // Check Quota (request count)
         const quota = await quotaManager.checkQuota(userId, task.agent);
         if (quota.isExceeded) {
             throw new Error(`Quota exceeded for agent ${task.agent}. Limit: ${quota.limit}, Used: ${quota.used}`);
+        }
+
+        // Check Cost Budget ($ spent)
+        const costBudget = await quotaManager.checkCostBudget(userId, task.agent);
+        if (costBudget.exceeded) {
+            throw new Error(`Daily cost budget exceeded for ${task.agent}. Spent: $${costBudget.spent.toFixed(4)}, Limit: $${costBudget.limit.toFixed(2)}`);
         }
 
         // Track action

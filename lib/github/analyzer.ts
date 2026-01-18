@@ -96,6 +96,67 @@ export async function analyzeRepository(
 }
 
 /**
+ * Analyze local files (for KilatCode-generated code)
+ * Does NOT require GitHubClient - works with files directly
+ */
+export async function analyzeLocalFiles(
+    files: Record<string, string>,
+    options: {
+        checks?: Array<'security' | 'performance' | 'bugs' | 'style'>;
+        model?: string;
+        projectName?: string;
+    } = {}
+): Promise<AnalysisResult> {
+    const {
+        checks = ['security', 'performance', 'bugs'],
+        model,
+        projectName = 'local-project'
+    } = options;
+
+    console.log(`🔍 Analyzing local files: ${Object.keys(files).length} files`);
+
+    // Filter to code files only
+    const codePattern = /\.(ts|tsx|js|jsx|py|css|html)$/;
+    const relevantFiles = Object.entries(files)
+        .filter(([path]) => codePattern.test(path))
+        .slice(0, 50); // Max 50 files
+
+    console.log(`📁 Analyzing ${relevantFiles.length} code files`);
+
+    const allIssues: CodeIssue[] = [];
+
+    for (const [filePath, content] of relevantFiles) {
+        if (!content || content.length < 10) continue;
+
+        try {
+            const issues = await analyzeFileContent(filePath, content, checks, model);
+            allIssues.push(...issues);
+        } catch (error) {
+            console.error(`Error analyzing ${filePath}:`, error);
+        }
+    }
+
+    // Calculate summary
+    const summary = {
+        errors: allIssues.filter(i => i.severity === 'error').length,
+        warnings: allIssues.filter(i => i.severity === 'warning').length,
+        info: allIssues.filter(i => i.severity === 'info').length
+    };
+
+    console.log(`✅ Analysis complete: ${summary.errors} errors, ${summary.warnings} warnings`);
+
+    return {
+        repository: {
+            owner: 'local',
+            repo: projectName,
+            filesAnalyzed: relevantFiles.length
+        },
+        issues: allIssues,
+        summary
+    };
+}
+
+/**
  * Analyze single file content
  */
 async function analyzeFileContent(
