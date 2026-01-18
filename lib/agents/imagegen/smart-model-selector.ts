@@ -16,11 +16,25 @@ export type ImageStyle = 'anime' | 'realistic' | 'artistic' | 'abstract' | 'phot
 // ============================================================================
 // TIER-BASED MODEL POOLS
 // Each tier has access to different model sets
+// ALL TIERS START FROM FLUX (user requirement 2026-01-18)
 // ============================================================================
 const TIER_MODEL_POOLS: Record<UserTier, PollinationImageModel[]> = {
-    free: ['flux', 'zimage'],                                    // Cheapest models
-    pro: ['flux', 'zimage', 'turbo', 'seedream', 'seedream-pro', 'kontext'],
-    enterprise: ['flux', 'zimage', 'turbo', 'seedream', 'seedream-pro', 'kontext', 'nanobanana', 'nanobanana-pro', 'gptimage', 'gptimage-large'],
+    free: ['flux', 'zimage', 'turbo'],  // 3 models
+    pro: ['flux', 'zimage', 'turbo', 'seedream', 'kontext'],  // 5 models
+    enterprise: ['flux', 'zimage', 'turbo', 'seedream', 'kontext', 'gptimage', 'seedream-pro'],  // 7 models
+};
+
+// ============================================================================
+// TIER-SPECIFIC FALLBACK CHAINS (2026-01-18)
+// All tiers start from flux, higher tiers have more fallback options
+// FREE: flux → zimage → turbo
+// PRO: flux → zimage → turbo → seedream → kontext
+// ENT: flux → zimage → turbo → seedream → kontext → gptimage → seedream-pro
+// ============================================================================
+const TIER_FALLBACK_ORDER: Record<UserTier, PollinationImageModel[]> = {
+    free: ['flux', 'zimage', 'turbo'],
+    pro: ['flux', 'zimage', 'turbo', 'seedream', 'kontext'],
+    enterprise: ['flux', 'zimage', 'turbo', 'seedream', 'kontext', 'gptimage', 'seedream-pro'],
 };
 
 // ============================================================================
@@ -118,20 +132,20 @@ const STYLE_KEYWORDS: Record<ImageStyle, RegExp[]> = {
 };
 
 // ============================================================================
-// FALLBACK CHAINS
-// If optimal model fails, try next in chain
+// FALLBACK CHAINS (deprecated - use TIER_FALLBACK_ORDER instead)
+// Kept for backward compatibility
 // ============================================================================
 const FALLBACK_CHAINS: Record<PollinationImageModel, PollinationImageModel[]> = {
-    'gptimage-large': ['gptimage', 'seedream-pro', 'seedream', 'flux'],
-    'gptimage': ['seedream-pro', 'seedream', 'kontext', 'flux'],
-    'nanobanana-pro': ['nanobanana', 'seedream-pro', 'flux'],
-    'nanobanana': ['kontext', 'seedream', 'flux'],
-    'seedream-pro': ['seedream', 'kontext', 'flux'],
-    'seedream': ['kontext', 'turbo', 'flux'],
-    'kontext': ['seedream', 'turbo', 'flux'],
+    'flux': ['zimage', 'turbo'],
+    'zimage': ['turbo', 'flux'],
     'turbo': ['zimage', 'flux'],
-    'zimage': ['flux', 'turbo'],
-    'flux': ['zimage', 'turbo'],  // Ultimate fallback
+    'seedream': ['kontext', 'turbo', 'zimage', 'flux'],
+    'kontext': ['seedream', 'turbo', 'zimage', 'flux'],
+    'gptimage': ['seedream-pro', 'seedream', 'kontext', 'turbo', 'zimage', 'flux'],
+    'seedream-pro': ['gptimage', 'seedream', 'kontext', 'turbo', 'zimage', 'flux'],
+    'gptimage-large': ['gptimage', 'seedream-pro', 'seedream', 'kontext', 'turbo', 'zimage', 'flux'],
+    'nanobanana': ['kontext', 'seedream', 'turbo', 'zimage', 'flux'],
+    'nanobanana-pro': ['nanobanana', 'seedream-pro', 'kontext', 'turbo', 'zimage', 'flux'],
 };
 
 // ============================================================================
@@ -160,6 +174,8 @@ export function detectStyle(prompt: string): ImageStyle {
 
 /**
  * Smart select image model based on tier and prompt
+ * NOTE (2026-01-18): All tiers now START with flux per user requirement.
+ * Style detection is kept for fallback ordering information only.
  */
 export function smartSelectImageModel(
     prompt: string,
@@ -171,97 +187,64 @@ export function smartSelectImageModel(
     reason: string;
     fallbacks: PollinationImageModel[];
 } {
-    // 1. Detect style from prompt
+    // 1. Detect style from prompt (for logging/fallback info only)
     let detectedStyle = detectStyle(prompt);
 
-    // 2. Mode overrides
+    // 2. Mode overrides (for logging only)
     if (mode === 'ui-mockup') {
         detectedStyle = 'ui';
     } else if (mode === 'style-transfer') {
         detectedStyle = 'artistic';
     }
 
-    // 3. Get optimal model for style
-    const styleConfig = STYLE_MODEL_MAP[detectedStyle];
-    let optimalModel = styleConfig.optimal;
+    // 3. ALWAYS start with flux (user requirement 2026-01-18)
+    // All tiers start from flux, fallback order differs by tier
+    const startModel: PollinationImageModel = 'flux';
 
-    // 4. Check if optimal model is available for user's tier
-    const availableModels = TIER_MODEL_POOLS[userTier];
+    // 4. Get tier-specific fallbacks
+    const tierFallbacks = TIER_FALLBACK_ORDER[userTier].slice(1); // Exclude flux since it's the primary
 
-    if (!availableModels.includes(optimalModel)) {
-        // Find best alternative available for this tier
-        for (const alt of styleConfig.alternatives) {
-            if (availableModels.includes(alt)) {
-                console.log(`🔄 Model ${optimalModel} not available for ${userTier}, using ${alt}`);
-                optimalModel = alt;
-                break;
-            }
-        }
-
-        // If no alternative found, use tier default
-        if (!availableModels.includes(optimalModel)) {
-            optimalModel = availableModels[0]; // First in pool is default
-            console.log(`⚠️ No style-matched model available, using tier default: ${optimalModel}`);
-        }
-    }
-
-    // 5. Get fallbacks (filtered by tier)
-    const allFallbacks = FALLBACK_CHAINS[optimalModel] || [];
-    const tierFallbacks = allFallbacks.filter(m => availableModels.includes(m));
-
-    const reason = availableModels.includes(styleConfig.optimal)
-        ? styleConfig.reason
-        : `${styleConfig.reason} (tier-adjusted to ${optimalModel})`;
-
-    console.log(`✨ Smart Model Selection: ${optimalModel} for "${detectedStyle}" style (${userTier} tier)`);
+    console.log(`✨ Smart Model Selection: ${startModel} for "${detectedStyle}" style (${userTier} tier)`);
+    console.log(`   → Fallback chain: ${tierFallbacks.join(' → ')}`);
 
     return {
-        model: optimalModel,
+        model: startModel,
         style: detectedStyle,
-        reason,
+        reason: `All tiers start with flux (cheapest, most reliable). Fallbacks: ${tierFallbacks.join(' → ')}`,
         fallbacks: tierFallbacks
     };
 }
 
 /**
- * Get next fallback model
+ * Get next fallback model based on tier-specific order
+ * All tiers start from flux and progressively try more models
  */
 export function getNextFallback(
     currentModel: PollinationImageModel,
     userTier: UserTier,
     attemptedModels: PollinationImageModel[] = []
 ): PollinationImageModel | null {
-    const availableModels = TIER_MODEL_POOLS[userTier];
-    const fallbacks = FALLBACK_CHAINS[currentModel] || [];
+    // Use tier-specific fallback order
+    const fallbackOrder = TIER_FALLBACK_ORDER[userTier];
 
-    for (const fallback of fallbacks) {
-        if (availableModels.includes(fallback) && !attemptedModels.includes(fallback)) {
-            console.log(`🔄 Fallback: ${currentModel} → ${fallback}`);
-            return fallback;
-        }
-    }
-
-    // Ultimate fallback: first model in tier pool not yet attempted
-    for (const model of availableModels) {
+    // Find next model in the fallback order that hasn't been attempted
+    for (const model of fallbackOrder) {
         if (!attemptedModels.includes(model)) {
-            console.log(`⚠️ Ultimate fallback: ${model}`);
+            console.log(`🔄 Fallback: ${currentModel} → ${model} (tier: ${userTier})`);
             return model;
         }
     }
 
+    console.log(`⚠️ All ${fallbackOrder.length} models exhausted for ${userTier} tier`);
     return null; // All models exhausted
 }
 
 /**
- * Get tier-default model (fastest/cheapest for tier)
+ * Get tier-default model - ALWAYS starts with flux (user requirement 2026-01-18)
  */
 export function getTierDefaultModel(userTier: UserTier): PollinationImageModel {
-    const defaults: Record<UserTier, PollinationImageModel> = {
-        free: 'flux',
-        pro: 'seedream',
-        enterprise: 'gptimage'
-    };
-    return defaults[userTier];
+    // All tiers start with flux (cheapest, most reliable)
+    return 'flux';
 }
 
 /**

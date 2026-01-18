@@ -243,6 +243,10 @@ export async function generateImages(params: ImageGenParams): Promise<ImageGenRe
         }
 
         throw lastError || new Error(`Image generation failed after ${MAX_RETRIES} attempts. Models tried: ${attemptedModels.join(', ')}`);
+    } catch (outerError) {
+        // Catch any unexpected errors from setup/initialization
+        console.error('❌ [ImageGen] Unexpected error:', outerError);
+        throw outerError;
     }
 }
 
