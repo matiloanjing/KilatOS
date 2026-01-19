@@ -38,7 +38,116 @@ export interface QuotaStatus {
 // Quota Manager Class
 // ============================================================================
 
+// Cache entry type
+interface CacheEntry<T> {
+    data: T;
+    expires: number;
+}
+
 class QuotaManager {
+    // =========================================================================
+    // In-Memory Cache (TTL: 30 seconds)
+    // Reduces DB calls for repeated checkQuota/checkCostBudget calls
+    // within same request lifecycle (e.g., multi-agent orchestration)
+    // =========================================================================
+    private tierCache = new Map<string, CacheEntry<string>>();
+    private limitsCache = new Map<string, CacheEntry<number>>();
+    private costLimitsCache = new Map<string, CacheEntry<number>>();
+    private readonly CACHE_TTL_MS = 30_000; // 30 seconds
+
+    /**
+     * Get cached tier or fetch from DB
+     */
+    private async getCachedTier(userId: string): Promise<string> {
+        const cacheKey = userId;
+        const cached = this.tierCache.get(cacheKey);
+
+        if (cached && cached.expires > Date.now()) {
+            return cached.data;
+        }
+
+        // Fetch from DB
+        const { getUserTier } = await import('@/lib/auth/user-tier');
+        const tier = await getUserTier(userId);
+
+        // Cache result
+        this.tierCache.set(cacheKey, {
+            data: tier,
+            expires: Date.now() + this.CACHE_TTL_MS
+        });
+
+        return tier;
+    }
+
+    /**
+     * Get cached daily limit or fetch from DB
+     */
+    private async getCachedLimit(tier: string, category: string): Promise<number> {
+        const cacheKey = `${tier}:${category}`;
+        const cached = this.limitsCache.get(cacheKey);
+
+        if (cached && cached.expires > Date.now()) {
+            return cached.data;
+        }
+
+        // Fetch from DB
+        const { data: limitData } = await supabase
+            .from('tier_limits')
+            .select('limit_daily')
+            .eq('tier', tier)
+            .eq('agent_id', category)
+            .single();
+
+        // Fallback limits if DB query fails
+        let limit = 20;
+        if (limitData?.limit_daily) {
+            limit = limitData.limit_daily;
+        } else {
+            if (tier === 'free') limit = category === 'image' ? 5 : 20;
+            else if (tier === 'pro') limit = category === 'image' ? 20 : 100;
+            else if (tier === 'enterprise') limit = category === 'image' ? 50 : 500;
+        }
+
+        // Cache result
+        this.limitsCache.set(cacheKey, {
+            data: limit,
+            expires: Date.now() + this.CACHE_TTL_MS
+        });
+
+        return limit;
+    }
+
+    /**
+     * Get cached cost limit or fetch from DB
+     */
+    private async getCachedCostLimit(tier: string, category: string): Promise<number> {
+        const cacheKey = `cost:${tier}:${category}`;
+        const cached = this.costLimitsCache.get(cacheKey);
+
+        if (cached && cached.expires > Date.now()) {
+            return cached.data;
+        }
+
+        // Fetch from DB
+        const { data: limitData } = await supabase
+            .from('tier_limits')
+            .select('max_daily_cost_usd')
+            .eq('tier', tier)
+            .eq('agent_id', category)
+            .single();
+
+        // Fallback limits
+        const costLimit = parseFloat(limitData?.max_daily_cost_usd) ||
+            (tier === 'free' ? 0.50 : tier === 'pro' ? 2.00 : 25.00);
+
+        // Cache result
+        this.costLimitsCache.set(cacheKey, {
+            data: costLimit,
+            expires: Date.now() + this.CACHE_TTL_MS
+        });
+
+        return costLimit;
+    }
 
     /**
      * Check if user has quota remaining for an agent
@@ -63,33 +172,12 @@ class QuotaManager {
 
         const used = usageData?.count || 0;
 
-        // 2. Get user tier
-        const { getUserTier } = await import('@/lib/auth/user-tier');
-        const tier = await getUserTier(userId);
+        // 2. Get user tier (CACHED)
+        const tier = await this.getCachedTier(userId);
 
-        // 3. Get specific limit for this agent & tier from DB
-        const { data: limitData, error: limitError } = await supabase
-            .from('tier_limits')
-            .select('limit_daily')
-            .eq('tier', tier)
-            .eq('agent_id', this.mapAgentToCategory(agentId))
-            .single();
-
-        // Fallback limits if DB query fails or row missing
-        // Free: 20 code / 5 image
-        // Paid: 100 code / 20 image (legacy name 'pro' handled via tier mapping if needed)
-        // Enterprise: 500 code / 50 image
-        let limit = 20; // Default safety fallback
-
-        if (limitData?.limit_daily) {
-            limit = limitData.limit_daily;
-        } else {
-            // Hardcoded fallback logic matching spec
-            const category = this.mapAgentToCategory(agentId);
-            if (tier === 'free') limit = category === 'image' ? 5 : 20;
-            else if (tier === 'pro') limit = category === 'image' ? 20 : 100;
-            else if (tier === 'enterprise') limit = category === 'image' ? 50 : 500;
-        }
+        // 3. Get specific limit for this agent & tier (CACHED)
+        const category = this.mapAgentToCategory(agentId);
+        const limit = await this.getCachedLimit(tier, category);
 
         const remaining = Math.max(0, limit - used);
 
@@ -123,22 +211,12 @@ class QuotaManager {
     ): Promise<{ exceeded: boolean; spent: number; limit: number; remaining: number }> {
         const today = this.getTodayDate();
 
-        // 1. Get user tier
-        const { getUserTier } = await import('@/lib/auth/user-tier');
-        const tier = await getUserTier(userId);
+        // 1. Get user tier (CACHED)
+        const tier = await this.getCachedTier(userId);
 
-        // 2. Get cost limit from tier_limits
+        // 2. Get cost limit (CACHED)
         const category = this.mapAgentToCategory(agentId);
-        const { data: limitData } = await supabase
-            .from('tier_limits')
-            .select('max_daily_cost_usd')
-            .eq('tier', tier)
-            .eq('agent_id', category)
-            .single();
-
-        // Fallback limits if not found
-        const costLimit = parseFloat(limitData?.max_daily_cost_usd) ||
-            (tier === 'free' ? 0.50 : tier === 'pro' ? 2.00 : 25.00);
+        const costLimit = await this.getCachedCostLimit(tier, category);
 
         // 3. Get today's total cost from agent_usage_logs
         const { data: costData } = await supabase

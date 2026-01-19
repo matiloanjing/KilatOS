@@ -14,11 +14,28 @@
  * Copyright © 2026 KilatOS
  */
 
+// Import TestExecutor types for testResults integration
+import type { TestExecutionResult, GeneratedTest, TestValidation } from '@/lib/agents/codegen/test-executor';
 import { aiMandor } from '@/lib/ai/mandor';
+
+// Re-export for consumers
+export type { TestExecutionResult, GeneratedTest, TestValidation };
 
 // =====================================================
 // TYPES
 // =====================================================
+
+export interface TestResults {
+    success: boolean;
+    passed: number;
+    failed: number;
+    total: number;
+    issues?: string[];
+    // Extended fields from TestExecutor (optional)
+    tests?: GeneratedTest[];
+    validation?: TestValidation;
+    execution?: TestExecutionResult;
+}
 
 export interface VerificationResult {
     success: boolean;
@@ -26,6 +43,7 @@ export interface VerificationResult {
     issues: string[];
     fixes: string[];
     greeting: string;
+    testResults?: TestResults; // TestExecutor integration
 }
 
 export interface ProjectStructure {
@@ -406,7 +424,8 @@ export async function finalVerify(
     files: Record<string, string>,
     userPrompt: string,
     projectName: string,
-    userId?: string
+    userId?: string,
+    selectedModel?: string  // User's selected model for AI operations
 ): Promise<VerificationResult> {
     console.log('\n🔍 [FinalVerifier] Starting final verification...');
     console.log(`   Files received: ${Object.keys(files).length}`);

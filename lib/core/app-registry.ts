@@ -827,7 +827,7 @@ class KilatChatApp extends BaseKilatApp {
                     context
                 ),
                 complexity: 'light',
-                priority: 'medium'
+                priority: 'normal'
             });
 
             return {

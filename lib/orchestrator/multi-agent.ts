@@ -1015,7 +1015,7 @@ Return JSON ONLY (no markdown):
             const result = await aiMandor.call({
                 prompt: enhanced.systemPrompt,  // ENHANCED: Per-agent RAG + RLHF + Memory + Patterns
                 complexity: task.priority === 'high' ? 'heavy' : 'medium',
-                priority: task.priority,
+                priority: task.priority === 'medium' ? 'normal' : task.priority as 'high' | 'low',
                 model: modelToUse,
                 userId: this.currentUserId, // Propagate userId for tier detection
                 enableThinking: true // AGENT EXECUTION: Thinking Enabled via prompt (Deep Reasoning)

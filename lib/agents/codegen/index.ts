@@ -489,7 +489,7 @@ export class KilatCodeAgent extends AgentPipeline<InternalCodeGenInput, CodeGenR
                             success: verifyResult.success,
                             testsGenerated: verifyResult.tests.length,
                             coverage: verifyResult.validation.estimatedCoverage,
-                            issues: verifyResult.validation.issues.map(i => i.description),
+                            issues: verifyResult.validation.issues.map((i: { description: string }) => i.description),
                             fixApplied: Boolean(verifyResult.fixedCode)
                         };
 

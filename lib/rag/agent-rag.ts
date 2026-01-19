@@ -387,7 +387,7 @@ export async function syncFallbackPatternToLearning(params: {
     userId?: string;
 }): Promise<boolean> {
     try {
-        const rag = new EnhancedRAG(params.userId);
+        const rag = new EnhancedRAG(); // Uses default embedding model
 
         const documentText = `
 # Image Generation Fallback Pattern

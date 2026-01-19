@@ -291,7 +291,7 @@ If any check fails, FIX IT before submitting.`;
             prompt: fullPrompt,
             complexity: maxTokens > 2500 ? 'heavy' :
                 maxTokens > 1500 ? 'medium' : 'light',
-            priority
+            priority: priority === 'medium' ? 'normal' : priority as 'high' | 'low'
         });
     }
 
