@@ -23,7 +23,8 @@ export async function GET(request: Request) {
             }, { status: 400 });
         }
 
-        const job = await jobQueue.getJob(jobId);
+        // FIX 2026-01-19: Use getJobWithCleanup to auto-fail stuck jobs (>10 min processing)
+        const job = await jobQueue.getJobWithCleanup(jobId, 10);
 
         if (!job) {
             return NextResponse.json({

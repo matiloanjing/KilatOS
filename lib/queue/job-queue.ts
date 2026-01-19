@@ -211,6 +211,74 @@ export class JobQueue {
             return false;
         }
     }
+
+    /**
+     * Cleanup stuck jobs (mark as failed if processing for too long)
+     * Called by status API to auto-recover stuck jobs
+     * 
+     * FIX 2026-01-19: Vercel function timeouts leave jobs in "processing" forever.
+     * This method marks stuck jobs as failed so users can retry.
+     * 
+     * @param maxAgeMinutes - Jobs processing longer than this are marked failed (default 10 min)
+     */
+    async cleanupStuckJobs(maxAgeMinutes: number = 10): Promise<number> {
+        if (!this.isInitialized) return 0;
+
+        try {
+            const cutoffTime = new Date(Date.now() - maxAgeMinutes * 60 * 1000).toISOString();
+
+            const { data, error } = await this.supabase
+                .from('job_queue')
+                .update({
+                    status: 'failed',
+                    error_message: `Job timed out (stuck processing for over ${maxAgeMinutes} minutes). Please try again.`,
+                    completed_at: new Date().toISOString()
+                })
+                .eq('status', 'processing')
+                .lt('started_at', cutoffTime)
+                .select('id');
+
+            if (error) {
+                console.error('cleanupStuckJobs error:', error.message);
+                return 0;
+            }
+
+            const count = data?.length || 0;
+            if (count > 0) {
+                console.log(`🧹 Cleaned up ${count} stuck jobs`);
+            }
+            return count;
+        } catch (error) {
+            console.error('JobQueue.cleanupStuckJobs error:', error);
+            return 0;
+        }
+    }
+
+    /**
+     * Get job with automatic stuck-job cleanup
+     * If job is stuck processing, mark as failed
+     */
+    async getJobWithCleanup(jobId: string, maxAgeMinutes: number = 10): Promise<Job | null> {
+        const job = await this.getJob(jobId);
+
+        if (job && job.status === 'processing' && job.started_at) {
+            const startTime = new Date(job.started_at).getTime();
+            const maxAge = maxAgeMinutes * 60 * 1000;
+
+            if (Date.now() - startTime > maxAge) {
+                // Job is stuck - mark as failed
+                await this.updateJob(jobId, {
+                    status: 'failed',
+                    errorMessage: `Job timed out (stuck processing for over ${maxAgeMinutes} minutes). Please try again.`
+                });
+
+                // Return updated job
+                return await this.getJob(jobId);
+            }
+        }
+
+        return job;
+    }
 }
 
 // Export singleton
