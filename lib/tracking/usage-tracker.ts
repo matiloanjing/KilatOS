@@ -519,12 +519,13 @@ export class UsageTracker {
     }
 
     /**
-     * Get hour bucket (truncate to hour)
+     * Get hour bucket (truncate to hour) - Returns ISO string for PostgreSQL
+     * FIX: Date object was being converted to "Wed Jan 21..." format which PostgreSQL rejects
      */
-    private getHourBucket(date: Date): Date {
+    private getHourBucket(date: Date): string {
         const d = new Date(date);
         d.setMinutes(0, 0, 0);
-        return d;
+        return d.toISOString(); // Return ISO string, not Date object
     }
 
     /**
