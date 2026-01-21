@@ -217,6 +217,11 @@ export default function KilatCodePage({ params }: PageProps) {
         setMessages(prev => [...prev, userMessage]);
         setIsProcessing(true);
 
+        // CRITICAL FIX 2026-01-22: Clear old files when sending new prompt
+        // This prevents stale files from previous job showing while new job processes
+        setGeneratedFiles(null);
+        setSuggestions([]);
+
         const assistantMessage: Message = {
             id: `msg_${Date.now()}_assistant`,
             role: 'assistant',
