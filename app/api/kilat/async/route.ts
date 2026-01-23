@@ -21,6 +21,7 @@ import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/
 import { recordAgentExecution } from '@/lib/agents/adaptive/integration';
 import { prefetchRelatedPatterns } from '@/lib/cache/prefetch';
 import { semanticCache } from '@/lib/cache/semantic-cache';
+import { traceLogger, STEP_TYPES } from '@/lib/tracking/trace-logger';
 
 // =========================================================================
 // SPECIALIZED AGENT ORCHESTRATORS
@@ -179,6 +180,18 @@ async function processJobInBackground(
 ) {
     console.log(`🚀 Starting background job: ${jobId} (mode: ${mode}, model: ${selectedModel}, session: ${sessionId || 'none'})`);
     const startTime = Date.now(); // Track execution time for learning
+
+    // =========================================================================
+    // START REQUEST TRACE (Full granularity for all agents)
+    // =========================================================================
+    const traceId = await traceLogger.startTrace(
+        jobId,
+        sessionId,
+        userId || '',  // Handle undefined userId
+        agentType ? agentType : 'unknown',  // Explicit check for undefined agentType
+        mode,
+        message.substring(0, 200)
+    );
 
     // =========================================================================
     // ADAPTIVE AI CONTEXT (Per-User + Global Learning)
@@ -559,6 +572,245 @@ ${conversationContext ? `Previous conversation:\n${conversationContext}\n\n` : '
                 } catch (chatError) {
                     console.error('💬 Chat error:', chatError);
                     throw new Error(`Chat failed: ${chatError instanceof Error ? chatError.message : 'Unknown error'}`);
+                }
+
+            } else if (agentType === 'research') {
+                // =====================================================================
+                // RESEARCH FAST ROUTING - Quick research mode
+                // =====================================================================
+                console.log('🔬 Fast Mode: Using Research Agent (quick)');
+                traceLogger.addStep(traceId, STEP_TYPES.AI_CALL, 'research-fast');
+                await jobQueue.updateJob(jobId, { progress: 30, currentStep: '🔬 Fast mode: Quick research...' });
+
+                try {
+                    const researchResult = await research({
+                        topic: message,
+                        preset: 'quick',  // Fast preset for quick research
+                        kbName: sessionId || 'default',
+                        userId: userId,
+                        locale: 'id'
+                    });
+                    outputContent = researchResult.report || 'Research complete!';
+                    if (researchResult.citations) {
+                        filesObject = { 'citations.json': JSON.stringify(researchResult.citations, null, 2) };
+                    }
+                    await jobQueue.updateJob(jobId, { progress: 90, currentStep: '🔬 Research complete!' });
+                } catch (researchError) {
+                    throw new Error(`Research failed: ${researchError instanceof Error ? researchError.message : 'Unknown error'}`);
+                }
+
+            } else if (agentType === 'cowriter') {
+                // =====================================================================
+                // COWRITER FAST ROUTING - Quick content editing
+                // =====================================================================
+                console.log('✍️ Fast Mode: Using CoWriter Agent');
+                traceLogger.addStep(traceId, STEP_TYPES.AI_CALL, 'cowriter-fast');
+                await jobQueue.updateJob(jobId, { progress: 30, currentStep: '✍️ Fast mode: Quick edit...' });
+
+                try {
+                    const writeResult = await coWrite({
+                        operation: 'rewrite',
+                        content: message,
+                        userId: userId,
+                        locale: 'id'
+                    });
+                    outputContent = writeResult.modifiedContent;
+                    await jobQueue.updateJob(jobId, { progress: 90, currentStep: '✍️ Writing complete!' });
+                } catch (writeError) {
+                    throw new Error(`CoWriter failed: ${writeError instanceof Error ? writeError.message : 'Unknown error'}`);
+                }
+
+            } else if (agentType === 'solve') {
+                // =====================================================================
+                // SOLVE FAST ROUTING - Quick problem solving
+                // =====================================================================
+                console.log('🧮 Fast Mode: Using Solve Agent');
+                traceLogger.addStep(traceId, STEP_TYPES.AI_CALL, 'solve-fast');
+                await jobQueue.updateJob(jobId, { progress: 30, currentStep: '🧮 Fast mode: Solving...' });
+
+                try {
+                    const solveResult = await solve({
+                        question: message,
+                        kbName: sessionId || 'default',
+                        userId: userId,
+                        locale: 'id'
+                    });
+                    outputContent = solveResult.finalAnswer || 'Solution found!';
+                    if (solveResult.citations) {
+                        filesObject = { 'citations.json': JSON.stringify(solveResult.citations, null, 2) };
+                    }
+                    await jobQueue.updateJob(jobId, { progress: 90, currentStep: '🧮 Problem solved!' });
+                } catch (solveError) {
+                    throw new Error(`Solve failed: ${solveError instanceof Error ? solveError.message : 'Unknown error'}`);
+                }
+
+            } else if (agentType === 'question') {
+                // =====================================================================
+                // QUESTION FAST ROUTING - Quick quiz generation
+                // =====================================================================
+                console.log('❓ Fast Mode: Using Question Agent');
+                traceLogger.addStep(traceId, STEP_TYPES.AI_CALL, 'question-fast');
+                await jobQueue.updateJob(jobId, { progress: 30, currentStep: '❓ Fast mode: Generating quiz...' });
+
+                try {
+                    const questionResult = await generateQuestions({
+                        mode: 'custom',
+                        requirements: message,
+                        kbName: sessionId || 'default',
+                        count: 3,  // Fewer questions for fast mode
+                        difficulty: 'medium',
+                        questionType: 'multiple-choice',
+                        userId: userId,
+                        locale: 'id'
+                    });
+                    outputContent = JSON.stringify(questionResult.questions, null, 2);
+                    filesObject = { 'quiz.json': JSON.stringify(questionResult, null, 2) };
+                    await jobQueue.updateJob(jobId, { progress: 90, currentStep: '❓ Quiz generated!' });
+                } catch (questionError) {
+                    throw new Error(`Question failed: ${questionError instanceof Error ? questionError.message : 'Unknown error'}`);
+                }
+
+            } else if (agentType === 'guide') {
+                // =====================================================================
+                // GUIDE FAST ROUTING - Quick tutorial
+                // =====================================================================
+                console.log('📚 Fast Mode: Using Guide Agent');
+                traceLogger.addStep(traceId, STEP_TYPES.AI_CALL, 'guide-fast');
+                await jobQueue.updateJob(jobId, { progress: 30, currentStep: '📚 Fast mode: Creating guide...' });
+
+                try {
+                    const guideResult = await guide({
+                        notebooks: [message],
+                        kbName: sessionId || 'default',
+                        userId: userId,
+                        locale: 'id'
+                    });
+                    outputContent = guideResult.summary || 'Guide created!';
+                    filesObject = { 'guide.json': JSON.stringify(guideResult.knowledgePoints, null, 2) };
+                    await jobQueue.updateJob(jobId, { progress: 90, currentStep: '📚 Guide complete!' });
+                } catch (guideError) {
+                    throw new Error(`Guide failed: ${guideError instanceof Error ? guideError.message : 'Unknown error'}`);
+                }
+
+            } else if (agentType === 'ideagen') {
+                // =====================================================================
+                // IDEAGEN FAST ROUTING - Quick brainstorming
+                // =====================================================================
+                console.log('💡 Fast Mode: Using IdeaGen Agent');
+                traceLogger.addStep(traceId, STEP_TYPES.AI_CALL, 'ideagen-fast');
+                await jobQueue.updateJob(jobId, { progress: 30, currentStep: '💡 Fast mode: Generating ideas...' });
+
+                try {
+                    const ideaResult = await generateIdeas({
+                        topic: message,
+                        kbName: sessionId || 'default',
+                        count: 5,  // Fewer ideas for fast mode
+                        userId: userId,
+                        locale: 'id'
+                    });
+                    outputContent = ideaResult.synthesis || JSON.stringify(ideaResult.ideas, null, 2);
+                    filesObject = { 'ideas.json': JSON.stringify(ideaResult, null, 2) };
+                    await jobQueue.updateJob(jobId, { progress: 90, currentStep: '💡 Ideas generated!' });
+                } catch (ideaError) {
+                    throw new Error(`IdeaGen failed: ${ideaError instanceof Error ? ideaError.message : 'Unknown error'}`);
+                }
+
+            } else if (agentType === 'crawl') {
+                // =====================================================================
+                // CRAWL FAST ROUTING - Quick web scraping
+                // =====================================================================
+                console.log('🕷️ Fast Mode: Using Crawl Agent');
+                traceLogger.addStep(traceId, STEP_TYPES.AI_CALL, 'crawl-fast');
+                await jobQueue.updateJob(jobId, { progress: 30, currentStep: '🕷️ Fast mode: Crawling...' });
+
+                try {
+                    const crawler = new KilatCrawler();
+                    const crawlResult = await crawler.crawl({ url: message });
+                    await crawler.cleanup();
+                    outputContent = crawlResult.markdown || crawlResult.summary || 'Crawl complete!';
+                    filesObject = {
+                        'content.md': crawlResult.markdown || '',
+                        'metadata.json': JSON.stringify(crawlResult.metadata, null, 2)
+                    };
+                    await jobQueue.updateJob(jobId, { progress: 90, currentStep: '🕷️ Crawl complete!' });
+                } catch (crawlError) {
+                    throw new Error(`Crawl failed: ${crawlError instanceof Error ? crawlError.message : 'Unknown error'}`);
+                }
+
+            } else if (agentType === 'audit') {
+                // =====================================================================
+                // AUDIT FAST ROUTING - Quick code audit
+                // =====================================================================
+                console.log('🔍 Fast Mode: Using Audit Agent');
+                traceLogger.addStep(traceId, STEP_TYPES.AI_CALL, 'audit-fast');
+                await jobQueue.updateJob(jobId, { progress: 30, currentStep: '🔍 Fast mode: Quick audit...' });
+
+                try {
+                    const repoMatch = message.match(/github\.com\/([^\/]+)\/([^\/\s]+)/);
+                    const contextFiles = crossAgentContext?.files || null;
+
+                    if (repoMatch) {
+                        const [, owner, repo] = repoMatch;
+                        const githubClient = createGitHubClient(process.env.GITHUB_TOKEN || '');
+                        const auditResult = await analyzeRepository(githubClient, owner, repo.replace('.git', ''), {
+                            checks: ['security', 'bugs'],  // Fewer checks for fast mode
+                            maxFiles: 15,  // Less files for fast mode
+                            model: selectedModel
+                        });
+                        const issuesList = auditResult.issues.slice(0, 10).map((issue: any, i: number) =>
+                            `${i + 1}. **[${issue.severity.toUpperCase()}]** ${issue.file}:${issue.line || '?'}\n   ${issue.message}`
+                        ).join('\n\n');
+                        outputContent = `# 🔍 Quick Audit: ${owner}/${repo}\n\n${issuesList || 'No critical issues found! ✨'}`;
+                        filesObject = { 'audit-report.json': JSON.stringify(auditResult, null, 2) };
+                    } else if (contextFiles && Object.keys(contextFiles).length > 0) {
+                        const auditResult = await analyzeLocalFiles(contextFiles, {
+                            checks: ['security', 'bugs'],
+                            model: selectedModel,
+                            projectName: 'kilatcode-project'
+                        });
+                        const issuesList = auditResult.issues.slice(0, 10).map((issue: any, i: number) =>
+                            `${i + 1}. **[${issue.severity.toUpperCase()}]** ${issue.file}\n   ${issue.message}`
+                        ).join('\n\n');
+                        outputContent = `# 🔍 Quick Local Audit\n\n${issuesList || 'No critical issues found! ✨'}`;
+                        filesObject = { 'audit-report.json': JSON.stringify(auditResult, null, 2) };
+                    } else {
+                        outputContent = '❌ Please provide a GitHub URL or use from a KilatCode session.';
+                    }
+                    await jobQueue.updateJob(jobId, { progress: 90, currentStep: '🔍 Audit complete!' });
+                } catch (auditError) {
+                    throw new Error(`Audit failed: ${auditError instanceof Error ? auditError.message : 'Unknown error'}`);
+                }
+
+            } else if (agentType === 'docs') {
+                // =====================================================================
+                // DOCS FAST ROUTING - Quick documentation
+                // =====================================================================
+                console.log('📄 Fast Mode: Using Docs Agent');
+                traceLogger.addStep(traceId, STEP_TYPES.AI_CALL, 'docs-fast');
+                await jobQueue.updateJob(jobId, { progress: 30, currentStep: '📄 Fast mode: Generating docs...' });
+
+                try {
+                    const codeMatch = message.match(/```[\s\S]*?```/g);
+                    if (codeMatch && codeMatch.length > 0) {
+                        const codeFiles: Record<string, string> = {};
+                        codeMatch.forEach((block, i) => {
+                            const content = block.replace(/```\w*\n?/, '').replace(/```$/, '');
+                            codeFiles[`file${i + 1}.ts`] = content;
+                        });
+                        const docsResult = await generateDocumentation(
+                            codeFiles,
+                            { architecture: 'Unknown', files: Object.keys(codeFiles).map(f => ({ path: f, purpose: 'Generated', dependencies: [] })), dependencies: [] },
+                            'typescript',
+                            { format: 'markdown', includeExamples: false, includeAPI: true, includeDiagrams: false }  // Simpler for fast mode
+                        );
+                        outputContent = docsResult;
+                        filesObject = { 'documentation.md': docsResult };
+                    } else {
+                        outputContent = '# 📄 Documentation Generator\n\nProvide code in code blocks to generate documentation.';
+                    }
+                    await jobQueue.updateJob(jobId, { progress: 90, currentStep: '📄 Docs complete!' });
+                } catch (docsError) {
+                    throw new Error(`Docs failed: ${docsError instanceof Error ? docsError.message : 'Unknown error'}`);
                 }
 
             } else {
@@ -1020,6 +1272,14 @@ ${conversationContext ? `Previous conversation and context:\n${conversationConte
         });
 
         // =========================================================================
+        // END REQUEST TRACE
+        // =========================================================================
+        await traceLogger.endTrace(traceId, isActuallyFailed ? 'error' : 'success', {
+            file_count: filesObject ? Object.keys(filesObject).length : 0,
+            error_message: isActuallyFailed ? outputContent.substring(0, 200) : undefined
+        });
+
+        // =========================================================================
         // SAVE RESPONSE TO SESSION MEMORY
         // Enables context carryover for next request
         //=========================================================================
@@ -1096,6 +1356,18 @@ ${conversationContext ? `Previous conversation and context:\n${conversationConte
         }
 
         // =========================================================================
+        // END REQUEST TRACE - Finalize trace with success status
+        // =========================================================================
+        try {
+            await traceLogger.endTrace(traceId, 'success', {
+                file_count: filesObject ? Object.keys(filesObject).length : 0
+            });
+            console.log(`📊 Trace ended: ${traceId}`);
+        } catch (traceEndError) {
+            console.warn('⚠️ Trace end failed (non-blocking):', traceEndError);
+        }
+
+        // =========================================================================
         // ADAPTIVE LEARNING - Record execution for pattern learning
         // =========================================================================
         try {
@@ -1150,6 +1422,15 @@ ${conversationContext ? `Previous conversation and context:\n${conversationConte
 
     } catch (error) {
         console.error(`❌ Job failed: ${jobId}`, error);
+
+        // End trace with failure status
+        try {
+            await traceLogger.endTrace(traceId, 'error', {
+                error_message: error instanceof Error ? error.message : 'Unknown error'
+            });
+        } catch (traceEndError) {
+            console.warn('⚠️ Trace end (failure) failed:', traceEndError);
+        }
 
         await jobQueue.updateJob(jobId, {
             status: 'failed',

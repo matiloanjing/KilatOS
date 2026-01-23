@@ -1,7 +1,7 @@
 # KilatOS
 
 <p align="center">
-  <strong>⚡ AI-Powered Code Generation OS</strong>
+  <strong>⚡ AI-Powered Code Generation Operating System</strong>
 </p>
 
 <p align="center">
@@ -10,144 +10,64 @@
 
 ---
 
-## 🚀 Features
+## 🎯 What is KilatOS?
 
-## 📊 System Topology
+KilatOS is an intelligent development environment that combines **13 specialized AI agents**, a **self-improving learning system**, and a **hybrid IDE experience** to generate production-ready code through natural conversation.
 
-```mermaid
-graph TD
-    User((User))
-    FE["Frontend: Hybrid IDE"]
-    
-    User --> |Interaction| FE
-    
-    subgraph Frontend [Next.js Client]
-        FE --> |Chat Stream| Chat["KilatChat Panel"]
-        FE --> |Live Code| Work["Workspace Panel"]
-        Work --> |Monaco| Editor["Code Editor"]
-        Work --> |WebContainer| Preview["Live Preview"]
-    end
-    
-    API["Next.js API Routes"]
-    FE --> |API Request| API
-    
-    subgraph Backend [The Mandor Monolith]
-        Mandor["Mandor AI Gateway"]
-        API --> |Orchestrate| Mandor
-        
-        RLHF["RLHF Engine"]
-        Memory["User Memory"]
-        Patterns["Proven Patterns"]
-        
-        RLHF --> |Adjustments| Mandor
-        Memory --> |Preferences| Mandor
-        Patterns --> |Success History| Mandor
-        
-        Tier{"Tier Router"}
-        Mandor --> |Route| Tier
-        Tier --> |Simple| Cache["Semantic Cache"]
-        Tier --> |Complex| Planner["Planner Agent"]
-        
-        RAG["Per-Agent RAG"]
-        Mandor --> |Knowledge| RAG
-        Vector[("pgvector")]
-        RAG --> |Vector| Vector
-    end
-    
-    DB[("Supabase DB")]
-    Mandor --> |Store| DB
-    User --> |Feedback| RLHF
-```
-
-## 🔄 Request Processing Pipeline
-
-```mermaid
-graph TD
-    req(User Request) --> cache{Check Cache}
-    
-    %% Layer 1: Caching
-    cache -->|Hit| return[Return Instant Response]
-    cache -->|Miss| mode{Mode Selection}
-    
-    %% Layer 2: Orchestration
-    mode -->|Fast Mode| fast[Fast Executor]
-    mode -->|Planning Mode| plan[Planner Agent]
-    
-    %% Layer 3: Execution context
-    subgraph Execution [Agent Execution]
-        plan --> rag[RAG Retrieval]
-        fast --> rag
-        rag --> gen[LLM Generation]
-    end
-    
-    gen --> output(Final Response)
-    
-    %% Layer 4: Async Learning
-    output -->|Background| learn[AI Learning Loop]
-    subgraph Skynet [Skynet Async]
-        learn --> save_cache[Save to Job Queue]
-        learn --> rlhf[RLHF Analysis]
-        learn --> patterns[Pattern Recognition]
-    end
-    
-    return -.-> learn
-```
+**Live Production Stats:**
+- 🤖 **13 AI Agents** specialized for different tasks
+- 💾 **40 Database Tables** + 6 Analytics Views
+- 📦 **297 Projects Generated** in production
+- 🧠 **522 Knowledge Base Embeddings** (self-learning)
+- ⚡ **48 API Endpoints** powering the system
 
 ---
 
-## 🚀 Key Features
+## ⚡ Key Features
 
-### 🧠 Multi-Agent AI System
-- **13 Specialized Agents**: 
-  - `KilatCode` (Full-stack), `KilatDesign` (UI/UX), `KilatImage` (Media)
-  - `KilatAudit` (Code Review), `KilatDocs` (Documentation), `KilatResearch` (Deep Research)
-  - `KilatWrite` (Content), `KilatSolve` (STEM), `KilatQuestion` (Quiz)
-  - `KilatGuide` (Tutorial), `KilatIdea` (Brainstorm), `KilatCrawl` (Web Scraping), `KilatChat` (General)
-- **Intelligent Routing**: Tier-based model selection (Groq, Pollinations) with automatic fallback.
-- **Self-Healing**: Agents detect errors in generated code and auto-correct them.
-- **Distributed Rate Limiting**: Redis-based limits prevent API bans (100 concurrent users).
+### 🤖 13 Specialized AI Agents
+Each agent is an expert in its domain:
+- **KilatCode** - Full-stack code generation
+- **KilatDesign** - UI/UX design & mockups
+- **KilatResearch** - Deep research with citations
+- **KilatSolve** - STEM problem solving
+- **KilatAudit** - Code review & security
+- **+ 8 more agents** - Docs, Guides, Content, Quiz, Ideas, Web Scraping...
 
-### ⚡ Skynet Learning System (Self-Improving)
-The system gets smarter with every interaction:
-1.  **RLHF (Reinforcement Learning)**: Analyzes user feedback (👍/👎) to adjust prompt strategies.
-2.  **Persistent Cache**: 72-hour Supabase + Redis distributed cache to survive Vercel cold starts.
-3.  **Proven Patterns**: Automatically promotes successful code patterns to best practices.
-4.  **User Memory**: Remembers your coding style and preferences across sessions.
-
-### 🎨 KilatOS Design System
-A premium, dark-mode-first aesthetic:
-- **Palette**: Royal Purple (`#8B5CF6`) & Deep Obsidian (`#0A0A0B`)
-- **Typography**: Plus Jakarta Sans (Headers) + JetBrains Mono (Code)
-- **Effects**: Glassmorphism, Neon Glows, and smooth micro-interactions
+### 🧠 Skynet Learning System
+The AI gets smarter with every interaction:
+- **RLHF** - Learns from your feedback (👍/👎)
+- **Pattern Recognition** - Promotes successful code patterns
+- **User Memory** - Remembers your preferences
+- **Self-Improving** - 57 proven patterns discovered automatically
 
 ### 💻 Hybrid IDE Experience
-- **Monaco Editor**: Full VS Code experience in the browser.
-- **WebContainer**: Runs Node.js natively in Chrome (no backend required for preview).
-- **Live Preview**: See changes instantly as code generates.
+- **Monaco Editor** - Full VS Code experience in browser
+- **Live Preview** - See your app running instantly
+- **WebContainer** - Runs Node.js natively in Chrome (localhost)
+- **File Explorer** - Complete project management
 
 ---
 
 ## 🛠 Tech Stack
 
-| Category | Technology |
-|----------|------------|
-| Frontend | Next.js 14, React 18, TypeScript, TailwindCSS |
-| Backend | Next.js API Routes, Server Actions |
-| Database | Supabase (PostgreSQL) |
-| Cache | Upstash Redis (Distributed) |
-| Auth | NextAuth.js + Supabase Auth |
-| AI | Groq, OpenAI, Gemini, Pollinations API |
-| Editor | Monaco Editor |
-| Preview | WebContainer API |
-| Embeddings | Xenova Transformers (384-dim) |
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | Next.js 14, React 18, TypeScript, TailwindCSS |
+| **Backend** | Next.js API Routes (48 endpoints) |
+| **Database** | Supabase PostgreSQL (40 tables) |
+| **Cache** | Upstash Redis (distributed, 5 patterns) |
+| **AI** | Groq, Pollinations, OpenAI, Gemini |
+| **Editor** | Monaco Editor |
+| **Embeddings** | Xenova Transformers (384-dim) |
 
 ---
 
-## 📦 Installation
+## 🚀 Quick Start
 
 ```bash
-# Clone the repository
-git clone https://github.com/matiloanjing/KilatOS.git
+# Clone repository
+git clone https://github.com/yourusername/KilatOS.git
 cd KilatOS
 
 # Install dependencies
@@ -159,77 +79,116 @@ cp .env.example .env.local
 
 # Run development server
 npm run dev
+# Open http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
----
-
-## ⚙️ Environment Variables
-
-Create `.env.local` with the following:
+### Required Environment Variables
 
 ```env
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_key
 
 # AI Models (at least one required)
-GROQ_API_KEY=your_groq_api_key
-POLLINATION_API_KEY=your_pollination_api_key
+GROQ_API_KEY=your_groq_key              # Primary (Fast)
+POLLINATION_API_KEY=your_pollination_key # Fallback (Free)
 
-# Upstash Redis (Optional - improves scalability)
-UPSTASH_REDIS_REST_URL=your_upstash_url
-UPSTASH_REDIS_REST_TOKEN=your_upstash_token
-
-# Optional
-FIRECRAWL_API_KEY=your_firecrawl_token
-JINA_API_KEY=your_jina_token
+# Redis Cache (recommended)
+UPSTASH_REDIS_REST_URL=your_redis_url
+UPSTASH_REDIS_REST_TOKEN=your_token
 ```
 
 ---
 
-## 📁 Project Structure
-
-```
-KilatOS/
-├── app/                    # Next.js App Router
-│   ├── api/                # API Routes (Cron, KilatCode, Auth)
-│   ├── kilatcode/          # IDE Interface (Main App)
-│   ├── chat/               # Standalone Chat Interface
-│   └── admin/              # Admin Dashboard
-├── components/             # React Components
-│   ├── ui/                 # Design System (Radix UI + Tailwind)
-│   ├── workspace/          # IDE Panels (Explorer, Terminal)
-│   ├── MonacoEditor/       # Code Editor Wrapper
-│   └── WebContainer/       # Live Preview Runtime
-├── lib/                    # Core Business Logic
-│   ├── agents/             # 13 AI Agents (KilatCode, KilatDesign, etc.)
-│   ├── cache/              # Caching Layer (Persistent + InMemory)
-│   ├── learning/           # Skynet (RLHF, Self-Improve)
-│   ├── memory/             # User & Session Context
-│   ├── orchestrator/       # Mandor AI Gateway
-│   ├── rag/                # RAG & Knowledge Base
-│   └── auth/               # Supabase Auth Helpers
-├── hooks/                  # Custom React Hooks
-└── public/                 # Static Assets
-```
-
----
-
-## 🎯 Usage
+## 📖 Usage
 
 ### Generate a Web App
-1. Open KilatOS at `/kilatcode`
-2. Describe your app: "Create a Spotify clone with dark theme"
-3. Watch AI plan and generate your app
-4. Preview the running app in-browser
+
+1. Navigate to `/kilatcode`
+2. Describe your app: *"Create a landing page for crypto ICO"*
+3. AI generates complete project (15+ files)
+4. Preview instantly in browser
 5. Download or deploy to Vercel
 
-### Modes
-- **Planning Mode**: Best for complex apps (e-commerce, dashboards)
-- **Fast Mode**: Quick for simple components (buttons, forms)
+### Use Other Agents
+
+- `/kilatdesign` - Generate UI mockups & images
+- `/kilatresearch` - Deep research with citations
+- `/kilatsolve` - Solve math/physics problems
+- `/kilatguide` - Create step-by-step tutorials
+- `/kilatwrite` - Write blog posts & content
+- **+ 8 more specialized agents**
+
+---
+
+## 📊 System Architecture
+
+```
+User Request
+     ↓
+Frontend (35 Pages) → API Layer (48 Routes)
+     ↓
+MasterOrchestrator → Agent Router
+     ↓
+13 AI Agents → AI Gateway → LLM Models
+     ↓                ↓
+RAG System      Skynet Learning
+     ↓                ↓
+Supabase (40 Tables) + Redis Cache
+```
+
+**For detailed technical documentation, see [SYSTEM_BLUEPRINT.md](docs/SYSTEM_BLUEPRINT.md)**
+
+---
+
+## 🧠 Self-Improving AI
+
+KilatOS learns from every interaction:
+
+```
+User Feedback → RLHF Analysis → Prompt Adjustments
+                      ↓
+            Pattern Recognition → Knowledge Base
+                      ↓
+              Better Results Next Time
+```
+
+**Current Learning Stats:**
+- 57 proven patterns discovered
+- 327 requests analyzed
+- 93 user feedback entries
+- 225 performance metrics tracked
+
+---
+
+## ⚠️ Known Issues
+
+### WebContainer (Live Preview)
+- ✅ **Works on localhost** - Full functionality
+- ❌ **Broken on Vercel** - Requires COOP/COEP headers
+- **Solution:** Use Sandpack or deploy to StackBlitz for production
+
+---
+
+## 📄 Documentation
+
+- **[SYSTEM_BLUEPRINT.md](docs/SYSTEM_BLUEPRINT.md)** - Complete technical architecture
+- **[CLAUDE.md](CLAUDE.md)** - AI context & development guide
+- **Database Schema** - 40 tables documented in SYSTEM_BLUEPRINT.md
+
+---
+
+## 🗺️ Roadmap
+
+- [x] 13 AI Agents
+- [x] Self-improving learning system (Skynet)
+- [x] RAG knowledge base (522 embeddings)
+- [x] WebContainer preview (localhost)
+- [x] Distributed Redis cache
+- [ ] Fix WebContainer for Vercel production
+- [ ] Multi-model support (Claude, GPT-4)
+- [ ] Real-time collaboration
+- [ ] Mobile app
 
 ---
 
@@ -241,11 +200,13 @@ MIT License - KilatCode Studio 2026
 
 ## 🔗 Links
 
-- **Website**: [kilatos.com](https://kilatos.com)
-- **Discord**: [discord.gg/kilatos](https://discord.gg/kilatos)
+- **Live Demo:** [kilatos.vercel.app](https://kilatos.vercel.app)
+- **Documentation:** [SYSTEM_BLUEPRINT.md](docs/SYSTEM_BLUEPRINT.md)
+- **Discord:** [discord.gg/kilatos](https://discord.gg/kilatos)
 
 ---
 
 <p align="center">
-  <strong>Built with ❤️ by KilatCode Studio</strong>
+  <strong>Built with ❤️ by KilatCode Studio</strong><br/>
+  <em>Last verified: 2026-01-23</em>
 </p>
