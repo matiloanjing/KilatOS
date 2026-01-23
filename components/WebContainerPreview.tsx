@@ -268,13 +268,76 @@ export default function App() {
         entryImport = mountFiles['App.tsx'] || mountFiles['app.tsx'] ? './App.tsx' : './App.jsx';
     }
 
-    // Inject main.jsx if missing
+    // === CREATE INDEX.CSS IF MISSING (FIX 2026-01-23) ===
+    // This fixes: [plugin:vite:import-analysis] Failed to resolve import "./index.css"
+    if (!mountFiles['index.css']) {
+        // Look for existing CSS files in the mount files
+        const allFiles = Object.keys(mountFiles);
+        const cssFiles = allFiles.filter(f =>
+            f.endsWith('.css') &&
+            !f.includes('node_modules') &&
+            mountFiles[f]?.file?.contents
+        );
+
+        // Also check for nested CSS files (e.g., styles/globals.css)
+        const nestedCssFiles: string[] = [];
+        const findNestedCss = (obj: any, path: string = '') => {
+            for (const key of Object.keys(obj)) {
+                const fullPath = path ? `${path}/${key}` : key;
+                if (obj[key]?.file?.contents && key.endsWith('.css')) {
+                    nestedCssFiles.push(fullPath);
+                } else if (obj[key]?.directory) {
+                    findNestedCss(obj[key].directory, fullPath);
+                }
+            }
+        };
+        findNestedCss(mountFiles);
+
+        const allCssFiles = [...cssFiles, ...nestedCssFiles];
+        console.log('🎨 [WebContainer] Found CSS files:', allCssFiles);
+
+        if (allCssFiles.length > 0) {
+            // Use content from first found CSS file
+            const firstCssPath = allCssFiles[0];
+            let cssContent = '';
+
+            if (cssFiles.includes(firstCssPath)) {
+                cssContent = mountFiles[firstCssPath]?.file?.contents || '';
+            } else {
+                // Navigate nested path (e.g., styles/globals.css)
+                const parts = firstCssPath.split('/');
+                let current = mountFiles;
+                for (let i = 0; i < parts.length - 1; i++) {
+                    current = current[parts[i]]?.directory || {};
+                }
+                cssContent = current[parts[parts.length - 1]]?.file?.contents || '';
+            }
+
+            mountFiles['index.css'] = { file: { contents: cssContent } };
+            console.log(`📦 [WebContainer] Created index.css from ${firstCssPath}`);
+        } else {
+            // Create minimal CSS reset
+            mountFiles['index.css'] = {
+                file: {
+                    contents: `/* Kilat Default Styles */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; background: #0f172a; color: #f1f5f9; }
+#root { min-height: 100vh; }
+`
+                }
+            };
+            console.log('📦 [WebContainer] Created default index.css');
+        }
+    }
+
+    // Inject main.jsx if missing (with CSS import)
     if (!mountFiles['main.jsx']) {
         mountFiles['main.jsx'] = {
             file: {
                 contents: `import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '${entryImport}';
+import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>

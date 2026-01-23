@@ -95,3 +95,4 @@ export async function PUT(req: NextRequest) {
         );
     }
 }
+export const dynamic = 'force-dynamic';
