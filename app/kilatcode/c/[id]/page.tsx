@@ -23,6 +23,7 @@ import WorkspacePanel from '@/components/WorkspacePanel';
 import { GlobalHeader } from '@/components/ui/GlobalHeader';
 import { ExplorerPanel } from '@/components/ui/ExplorerPanel';
 import { LoadingKilat } from '@/components/ui/LoadingKilat';
+import { ProcessingSteps } from '@/components/ui/ProcessingSteps';
 import { AgentSuggestionPanel } from '@/components/agents/AgentSuggestionPanel';
 import { getPostTaskSuggestions, AGENT_ROUTES, type AgentSuggestion } from '@/lib/agents/post-task-suggestions';
 
@@ -71,6 +72,11 @@ export default function KilatCodePage({ params }: PageProps) {
 
     // Post-Task Suggestions (Cross-Agent Workflow)
     const [suggestions, setSuggestions] = useState<AgentSuggestion[]>([]);
+
+    // Progress Tracking (Claude Code-style)
+    const [currentStep, setCurrentStep] = useState<string>('Starting...');
+    const [stepHistory, setStepHistory] = useState<string[]>([]);
+    const [jobProgress, setJobProgress] = useState<number>(0);
 
     // Handle file changes from Monaco editor (auto-save)
     const handleFileChange = useCallback((filename: string, content: string) => {
@@ -222,6 +228,11 @@ export default function KilatCodePage({ params }: PageProps) {
         setGeneratedFiles(null);
         setSuggestions([]);
 
+        // Reset progress tracking for new job
+        setCurrentStep('Starting...');
+        setStepHistory([]);
+        setJobProgress(0);
+
         const assistantMessage: Message = {
             id: `msg_${Date.now()}_assistant`,
             role: 'assistant',
@@ -307,7 +318,24 @@ export default function KilatCodePage({ params }: PageProps) {
                 } else if (job?.status === 'failed') {
                     throw new Error(job.error || 'Job failed');
                 } else {
+                    // Update progress from backend
                     const progress = job?.progress || 0;
+                    const step = job?.currentStep || 'Processing...';
+
+                    setJobProgress(progress);
+
+                    // Add to step history if it's a new step
+                    if (step !== currentStep) {
+                        setCurrentStep(step);
+                        setStepHistory(prev => {
+                            // Avoid duplicates
+                            if (prev[prev.length - 1] !== step) {
+                                return [...prev.slice(-20), step]; // Keep last 20 steps
+                            }
+                            return prev;
+                        });
+                    }
+
                     setMessages(prev => prev.map(m =>
                         m.id === assistantMessage.id
                             ? {
@@ -507,6 +535,18 @@ export default function KilatCodePage({ params }: PageProps) {
                                 router.push(`/${route}/c/${projectId}`);
                             }}
                             onSkip={() => setSuggestions([])}
+                        />
+                    </div>
+                )}
+
+                {/* Claude Code-style Progress Display */}
+                {isProcessing && !isChatCollapsed && (
+                    <div className="absolute bottom-20 left-[64px] z-40 w-[360px] px-4">
+                        <ProcessingSteps
+                            isProcessing={isProcessing}
+                            currentStep={currentStep}
+                            progress={jobProgress}
+                            stepHistory={stepHistory}
                         />
                     </div>
                 )}
