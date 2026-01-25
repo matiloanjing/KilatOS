@@ -255,10 +255,59 @@ export class JobQueue {
     }
 
     /**
+     * Cleanup old completed/failed jobs to prevent database bloat
+     * @param maxAgeDays - Jobs older than this get deleted (default 7 days)
+     */
+    async cleanupOldJobs(maxAgeDays: number = 7): Promise<number> {
+        if (!this.isInitialized) return 0;
+
+        try {
+            const cutoffTime = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000).toISOString();
+
+            const { data, error } = await this.supabase
+                .from('job_queue')
+                .delete()
+                .in('status', ['completed', 'failed'])
+                .lt('completed_at', cutoffTime)
+                .select('id');
+
+            if (error) {
+                console.error('cleanupOldJobs error:', error.message);
+                return 0;
+            }
+
+            const count = data?.length || 0;
+            if (count > 0) {
+                console.log(`🧹 Cleaned up ${count} old jobs (>${maxAgeDays} days)`);
+            }
+            return count;
+        } catch (error) {
+            console.error('JobQueue.cleanupOldJobs error:', error);
+            return 0;
+        }
+    }
+
+    /**
      * Get job with automatic stuck-job cleanup
      * If job is stuck processing, mark as failed
+     * 
+     * ENHANCED: Also opportunistically cleans ALL stuck jobs (10% of polls)
+     * This provides redundancy in case cron doesn't run
      */
     async getJobWithCleanup(jobId: string, maxAgeMinutes: number = 10): Promise<Job | null> {
+        // ENHANCEMENT: 10% chance to clean ALL stuck jobs
+        // Distributes cleanup across polls without hammering the DB
+        if (Math.random() < 0.1) {
+            try {
+                const cleaned = await this.cleanupStuckJobs(maxAgeMinutes);
+                if (cleaned > 0) {
+                    console.log(`🧹 Opportunistic cleanup: ${cleaned} stuck jobs`);
+                }
+            } catch (e) {
+                // Silent fail - don't break polling
+            }
+        }
+
         const job = await this.getJob(jobId);
 
         if (job && job.status === 'processing' && job.started_at) {

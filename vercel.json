@@ -14,6 +14,10 @@
     },
     "crons": [
         {
+            "path": "/api/cron/cleanup-jobs",
+            "schedule": "*/5 * * * *"
+        },
+        {
             "path": "/api/cron/sync-code-rag",
             "schedule": "0 3 * * *"
         },
