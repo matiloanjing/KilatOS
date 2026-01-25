@@ -15,7 +15,7 @@
     "crons": [
         {
             "path": "/api/cron/cleanup-jobs",
-            "schedule": "0 * * * *"
+            "schedule": "0 5 * * *"
         },
         {
             "path": "/api/cron/sync-code-rag",
