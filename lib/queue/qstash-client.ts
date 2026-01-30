@@ -44,17 +44,40 @@ export function getQStashClient(): Client {
     return _qstashClient;
 }
 
+let _receiverKeyHash: string = '';
+
 /**
  * Get the QStash Receiver instance (lazy initialization)
- * This ensures signing keys are read at runtime, not build time
+ * Only caches if signing keys are valid - prevents caching empty keys on cold start
  */
 export function getQStashReceiver(): Receiver {
-    if (!_qstashReceiver) {
-        _qstashReceiver = new Receiver({
-            currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY || '',
-            nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY || '',
+    const currentKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
+    const nextKey = process.env.QSTASH_NEXT_SIGNING_KEY;
+    const keyHash = `${currentKey?.length || 0}-${nextKey?.length || 0}`;
+
+    // Log every time for debugging
+    console.log('🔧 [QStash getReceiver] Current key exists:', !!currentKey, 'length:', currentKey?.length || 0);
+    console.log('🔧 [QStash getReceiver] Next key exists:', !!nextKey, 'length:', nextKey?.length || 0);
+
+    if (!currentKey || !nextKey) {
+        console.error('❌ [QStash] Signing keys empty! QSTASH_CURRENT_SIGNING_KEY or QSTASH_NEXT_SIGNING_KEY not set');
+        // Return new receiver with empty keys (will fail verification) - don't cache
+        return new Receiver({
+            currentSigningKey: '',
+            nextSigningKey: '',
         });
     }
+
+    // Recreate if no receiver or keys changed
+    if (!_qstashReceiver || keyHash !== _receiverKeyHash) {
+        _qstashReceiver = new Receiver({
+            currentSigningKey: currentKey,
+            nextSigningKey: nextKey,
+        });
+        _receiverKeyHash = keyHash;
+        console.log('✅ [QStash] Receiver initialized, key lengths:', currentKey.length, nextKey.length);
+    }
+
     return _qstashReceiver;
 }
 
