@@ -15,22 +15,32 @@ import { Client, Receiver } from '@upstash/qstash';
 
 let _qstashClient: Client | null = null;
 let _qstashReceiver: Receiver | null = null;
+let _cachedTokenLength: number = 0;
 
 /**
  * Get the QStash client instance (lazy initialization)
- * This ensures QSTASH_TOKEN is read at runtime, not build time
+ * Only caches if token is valid - prevents caching empty token on cold start
  */
 export function getQStashClient(): Client {
-    if (!_qstashClient) {
-        const token = process.env.QSTASH_TOKEN;
-        if (!token) {
-            console.warn('⚠️ QSTASH_TOKEN not set - background jobs will fall back to fire-and-forget');
-        }
-        _qstashClient = new Client({
-            token: token || '',
-        });
-        console.log('🔧 [QStash] Client initialized at runtime, token exists:', !!token);
+    const token = process.env.QSTASH_TOKEN;
+    const tokenLength = token?.length || 0;
+
+    // Log every time for debugging
+    console.log('🔧 [QStash getClient] Token exists:', !!token, 'length:', tokenLength);
+
+    if (!token) {
+        console.error('❌ [QStash] QSTASH_TOKEN is empty/undefined!');
+        // Return new client (will fail on use) - don't cache
+        return new Client({ token: '' });
     }
+
+    // Recreate if no client or token changed (shouldn't happen but safety net)
+    if (!_qstashClient || tokenLength !== _cachedTokenLength) {
+        _qstashClient = new Client({ token });
+        _cachedTokenLength = tokenLength;
+        console.log('✅ [QStash] Client initialized, token length:', tokenLength);
+    }
+
     return _qstashClient;
 }
 
