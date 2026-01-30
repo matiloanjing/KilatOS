@@ -194,13 +194,16 @@ export function useJobResume(config: JobResumeConfig) {
                 onComplete?.(job);
                 return true;
             } else {
-                // Job failed or not found
+                // Job failed or not found - reset UI state
+                console.log(`❌ [${agentName}] Job not found or in invalid state:`, job?.status);
                 clearJob();
+                setIsProcessing?.(false);
                 return false;
             }
         } catch (error) {
             console.error(`❌ [${agentName}] Failed to resume job:`, error);
             clearJob();
+            setIsProcessing?.(false);
             return false;
         }
     }, [agentName, getStorageKey, clearJob, pollJobStatus, onProgress, onComplete, setIsProcessing, setMessages, setGeneratedFiles]);
