@@ -168,32 +168,30 @@ export async function POST(request: Request) {
         console.log('🔍 [QStash Debug] Result:', { fallback, messageId });
 
         if (fallback) {
-            // QStash not configured or failed - use fire-and-forget fallback
-            console.log('⚠️ Falling back to fire-and-forget (QStash unavailable)');
-            processJobInBackground(
-                jobId,
-                message || '',
-                executionMode,
-                selectedModel,
-                sessionId,
-                scopedClient,
-                user.id,
-                agentType || 'code',
-                attachments as AttachmentInput[]
-            ).catch(err => {
-                console.error(`Job ${jobId} failed:`, err);
+            // QStash not configured or failed - DO NOT use fire-and-forget (will hit Vercel timeout)
+            // Instead, mark job as failed immediately with clear error
+            console.error('❌ QStash publish failed - marking job as failed');
+            await jobQueue.updateJob(jobId, {
+                status: 'failed',
+                errorMessage: 'QStash unavailable. Please check QSTASH_TOKEN configuration.',
+                currentStep: '❌ QStash configuration error'
             });
+
+            return NextResponse.json({
+                success: false,
+                error: 'Background job system unavailable. Please try again later.',
+                jobId,
+                details: 'QStash not configured or publish failed'
+            }, { status: 503 });
         }
 
         // Return immediately with jobId
         return NextResponse.json({
             success: true,
             jobId,
-            message: fallback
-                ? 'Job submitted (fallback mode). Poll /api/kilat/status?jobId=xxx for updates.'
-                : 'Job queued to QStash. Poll /api/kilat/status?jobId=xxx for updates.',
+            message: 'Job queued to QStash. Poll /api/kilat/status?jobId=xxx for updates.',
             pollUrl: `/api/kilat/status?jobId=${jobId}`,
-            qstash: !fallback
+            qstash: true
         });
 
     } catch (error) {
